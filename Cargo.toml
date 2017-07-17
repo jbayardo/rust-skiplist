@@ -1,0 +1,9 @@
+[package]
+name = "skiplist"
+version = "0.1.0"
+authors = ["Julian Bayardo <julian@bayardo.info>"]
+
+[dependencies]
+rand = "*"
+log = "*"
+env_logger = "*"
