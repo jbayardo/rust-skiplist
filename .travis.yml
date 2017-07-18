@@ -1,0 +1,16 @@
+language: rust
+rust:
+  - stable
+  - beta
+  - nightly
+matrix:
+  allow_failures:
+    - rust: nightly
+env:
+  matrix:
+    - RUSTFLAGS="-Z sanitizer=address"
+    - RUSTFLAGS="-Z sanitizer=memory"
+    - RUSTFLAGS="-Z sanitizer=leak"
+    - RUSTFLAGS="-Z sanitizer=thread"
+  global:
+    - RUST_BACKTRACE=1
