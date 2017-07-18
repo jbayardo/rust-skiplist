@@ -26,4 +26,7 @@ fn main() {
 
 	let k : u32 = 3;
 	println!("{:?}", sk.get(&k));
+	println!("{:?}", sk.remove(&k));
+	println!("{:?}", sk.get(&k));
+	println!("{}", sk);
 }

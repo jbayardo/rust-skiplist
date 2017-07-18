@@ -85,7 +85,7 @@ impl<K> SkipList<K> {
 }
 
 impl<K: Ord> SkipList<K> {
-    fn find_infimum(&self, key: &K) -> &mut Node<K> {
+    fn find_lower_bound(&self, key: &K) -> &mut Node<K> {
         unsafe {
             let mut current = self.head_;
             for height in (0..self.height_).rev() {
@@ -99,7 +99,7 @@ impl<K: Ord> SkipList<K> {
         }
     }
 
-    fn find_infimum_with_updates(&self, key: &K)
+    fn find_lower_bound_with_updates(&self, key: &K)
       -> (&mut Node<K>, Vec<&mut Node<K>>) {
         unsafe {
             let mut updates = Vec::with_capacity(self.max_height_);
@@ -131,10 +131,10 @@ impl<K: Ord> SkipList<K> {
 
         unsafe {
             let (current, mut updates)
-                = self.find_infimum_with_updates(&key);
+                = self.find_lower_bound_with_updates(&key);
 
-            // The infimum's next node, if present, could be the same as the key
-            // we are looking for, so we could abort early here
+            // The lower bound's next node, if present, could be the same as the
+            // key we are looking for, so we could abort early here
             if current.has_next(0) {
                 if current.next(0).key() == &key {
                     return false;
@@ -143,7 +143,8 @@ impl<K: Ord> SkipList<K> {
 
             height = self.random_height();
 
-            // Generate the node, update predecessors
+            // Generate the node. All memory allocation is done using Box so
+            // that we can actually free it using Box later
             let node = Box::into_raw(Box::new(Node::new(key, height)));
             for h in 0..height + 1 {
                 if updates[h].has_next(h) {
@@ -160,7 +161,7 @@ impl<K: Ord> SkipList<K> {
     }
 
     pub fn get(&self, key: &K) -> Option<&K> {
-        let mut node : &Node<K> = self.find_infimum(key);
+        let mut node : &Node<K> = self.find_lower_bound(key);
         if node.has_next(0) {
             node = node.next(0);
             if node.key() == key {
@@ -176,15 +177,60 @@ impl<K: Ord> SkipList<K> {
         self.get(key).is_some()
     }
 
-    pub fn remove(&mut self, key: &K) -> Option<K> {
-        None
+    pub fn remove(&mut self, key: &K) -> bool {
+        unsafe {
+            let (current, mut updates)
+                = self.find_lower_bound_with_updates(&key);
+
+            // 'current' is the lower bound to the node, so if it doesn't have a
+            // next node at level 0, it means that 'key' is not present. If it
+            // does exist, then there is a possibility that it may be greater
+            // than the actual key we are looking for
+            if !current.has_next(0) {
+                return false
+            }
+
+            let next = current.mut_ptr_next(0);
+            // If the key is not the one that we are looking for, then that
+            // means we are done too
+            if (*next).key() != key {
+                return false
+            }
+
+            // Since the range is a [,) operation, we need to add one to the
+            // height
+            for h in 0..(*next).height() + 1 {
+                updates[h].set_next(h, (*next).mut_ptr_next(h));
+            }
+
+            // Free the memory for the 'next' pointer
+            Box::from_raw(next);
+            return true
+        }
     }
 
-    pub fn replace(&mut self, key: &K) -> Option<K> {
-        None
+    pub fn replace(&mut self, key: K) -> Option<K> {
+        let current = self.find_lower_bound(&key);
+
+        // 'current' is the lower bound to the node, so if it doesn't have a
+        // next node at level 0, it means that 'key' is not present. If it
+        // does exist, then there is a possibility that it may be greater
+        // than the actual key we are looking for
+        if !current.has_next(0) {
+            return None
+        }
+
+        let next = current.mut_next(0);
+        // If the key is not the one that we are looking for, then that
+        // means we are done too
+        if next.key() != &key {
+            return None
+        }
+
+        return Some(next.replace_key(key))
     }
 
-    // TODO(jbayard): implement range
+    // TODO(jbayardo): implement range
 }
 
 impl<K: Display + Copy> Display for SkipList<K> {

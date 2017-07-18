@@ -20,6 +20,11 @@ impl<K> Node<K> {
 	}
 
 	#[inline(always)]
+	pub fn height(&self) -> usize {
+		self.forward_.len() - 1
+	}
+
+	#[inline(always)]
 	pub fn has_next(&self, height: usize) -> bool {
 		height < self.forward_.len() && !self.forward_.index(height).is_null()
 	}
@@ -41,13 +46,13 @@ impl<K> Node<K> {
 	#[inline(always)]
 	pub fn ptr_next(&self, height: usize) -> *const Node<K> {
 		debug_assert!(self.has_next(height));
-		self.forward_[height].clone()
+		self.forward_[height]
 	}
 
 	#[inline(always)]
 	pub fn mut_ptr_next(&mut self, height: usize) -> *mut Node<K> {
 		debug_assert!(self.has_next(height));
-		self.forward_[height].clone()
+		self.forward_[height]
 	}
 
 	#[inline(always)]
@@ -59,5 +64,10 @@ impl<K> Node<K> {
 	#[inline(always)]
 	pub fn key(&self) -> &K {
 		&self.key_
+	}
+
+	#[inline(always)]
+	pub fn replace_key(&mut self, key : K) -> K {
+		std::mem::replace(&mut self.key_, key)
 	}
 }
