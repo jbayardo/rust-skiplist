@@ -1,40 +1,40 @@
 use node::Node;
 use list::SkipList;
 
-#[derive(Debug)]
-pub struct SkipListIter<K> {
-	current: *const Node<K>,
+use std;
+
+pub struct SkipListIter<'a, K: 'a> {
+	current_: *const Node<K>,
+	phantom_: std::marker::PhantomData<&'a K>,
 }
 
-impl<K> SkipListIter<K> {
-	pub fn new(item: &SkipList<K>) -> SkipListIter<K> {
-		if item.len() == 0 {
-			return SkipListIter {
-				current: ::std::ptr::null(),
-			};
-		}
-
+// TODO: attempt to convert all of this into safe rust??
+impl<'a, K> SkipListIter<'a, K> {
+	pub fn new(item: &'a SkipList<K>) -> SkipListIter<'a, K> {
 		unsafe {
 			SkipListIter {
-				current: (*item.head_).mut_ptr_next(0),
+				// 'current_' will be null if the list is empty
+				current_: (*item.head_).ptr_next(0),
+				phantom_: std::marker::PhantomData,
 			}
 		}
 	}
 }
 
-impl<K: Copy> Iterator for SkipListIter<K> {
-	type Item = K;
+impl<'a, K: 'a> Iterator for SkipListIter<'a, K> {
+	type Item = &'a K;
 
 	fn next(&mut self) -> Option<Self::Item> {
-		if self.current.is_null() {
+		// We have reached the end of the list
+		if self.current_.is_null() {
 			return None;
 		}
 
 		unsafe {
-			let c : &Node<K> = &*self.current;
+			let c : &Node<K> = &*self.current_;
 			if c.has_next(0) {
-				self.current = c.ptr_next(0);
-				Some(c.key().clone())
+				self.current_ = c.ptr_next(0);
+				Some(c.key())
 			} else {
 				None
 			}
@@ -42,7 +42,7 @@ impl<K: Copy> Iterator for SkipListIter<K> {
 	}
 }
 
-impl<K: Copy> SkipList<K> {
+impl<K> SkipList<K> {
 	pub fn iter(&self) -> SkipListIter<K> {
 		SkipListIter::new(self)
 	}

@@ -15,7 +15,7 @@ extern crate env_logger;
 fn main() {
 	::std::env::set_var("RUST_LOG", "debug");
 	env_logger::init().unwrap();
-	let mut sk : SkipList<u32> = SkipList::new(0.5, 16, 432112);
+	let mut sk : SkipList<u32> = SkipList::new(0.5, 16);
 
 	let mut k = 50;
 	while k > 0 {

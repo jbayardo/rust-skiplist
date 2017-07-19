@@ -20,9 +20,8 @@ pub struct SkipList<K> {
 }
 
 impl<K> SkipList<K> {
-    // TODO(jbayardo): find some way to remove placeholder
     #[inline(always)]
-    pub fn new(upgrade_probability: f64, max_height: usize, placeholder: K)
+    pub fn new(upgrade_probability: f64, max_height: usize)
       -> SkipList<K> {
         // This assertion is here because using Zero Sized Types requires
         // special handling which hasn't been implemented yet.
@@ -32,12 +31,16 @@ impl<K> SkipList<K> {
         assert!(upgrade_probability < 1.0);
         assert!(max_height > 0);
 
-        SkipList {
-            head_: Box::into_raw(Box::new(Node::new(placeholder, max_height))),
-            length_: 0,
-            upgrade_probability_: upgrade_probability,
-            max_height_: max_height,
-            height_: 0,
+        unsafe {
+            SkipList {
+                // It is ok to create the first node with uninitialized memory,
+                // because it will never be read by the algorithms.
+                head_: Box::into_raw(Box::new(Node::new(std::mem::uninitialized(), max_height))),
+                length_: 0,
+                upgrade_probability_: upgrade_probability,
+                max_height_: max_height,
+                height_: 0,
+            }
         }
     }
 
@@ -61,8 +64,9 @@ impl<K> SkipList<K> {
         self.length_ == 0
     }
 
+    #[inline(always)]
     pub fn clear(&mut self) {
-
+        *self = Self::new(self.upgrade_probability_, self.max_height_);
     }
 
     // Simulates a random variate with geometric distribution. The idea is that
@@ -85,6 +89,10 @@ impl<K> SkipList<K> {
 }
 
 impl<K: Ord> SkipList<K> {
+    // Finds the node previous to the node that would have 'key', if any.
+    //
+    // This function breaks the mutability correctness, because it takes a const
+    // reference to self and returns mutable nodes.
     fn find_lower_bound(&self, key: &K) -> &mut Node<K> {
         unsafe {
             let mut current = self.head_;
@@ -99,6 +107,12 @@ impl<K: Ord> SkipList<K> {
         }
     }
 
+    // Finds the node previous to the node that would have 'key', if any. It
+    // also generates an "updates" vector; the vector contains for index i, the
+    // last previous node that had height greater or equal than i.
+    //
+    // This function breaks the mutability correctness, because it takes a const
+    // reference to self and returns mutable nodes.
     fn find_lower_bound_with_updates(&self, key: &K)
       -> (&mut Node<K>, Vec<&mut Node<K>>) {
         unsafe {
@@ -147,10 +161,7 @@ impl<K: Ord> SkipList<K> {
             // that we can actually free it using Box later
             let node = Box::into_raw(Box::new(Node::new(key, height)));
             for h in 0..height + 1 {
-                if updates[h].has_next(h) {
-                    (*node).set_next(h, updates[h].mut_ptr_next(h));
-                }
-
+                (*node).set_next(h, updates[h].mut_ptr_next(h));
                 updates[h].set_next(h, node);
             }
         }
@@ -205,8 +216,11 @@ impl<K: Ord> SkipList<K> {
 
             // Free the memory for the 'next' pointer
             Box::from_raw(next);
-            return true
         }
+
+        // Update length
+        self.length_ -= 1;
+        return true
     }
 
     pub fn replace(&mut self, key: K) -> Option<K> {
@@ -233,9 +247,9 @@ impl<K: Ord> SkipList<K> {
     // TODO(jbayardo): implement range
 }
 
-impl<K: Display + Copy> Display for SkipList<K> {
+impl<K: Display> Display for SkipList<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "[").unwrap();
+        write!(f, "[ ").unwrap();
 
         for key in self.iter() {
             write!(f, "{} ", key).unwrap();
@@ -256,6 +270,16 @@ impl<K> Drop for SkipList<K> {
                 Box::from_raw(current);
                 current = next;
             }
+            Box::from_raw(current);
         }
     }
 }
+
+impl<K: Ord> std::ops::Index<K> for SkipList<K> {
+    type Output = K;
+
+    #[inline(always)]
+    fn index(&self, index: K) -> &Self::Output {
+        return self.get(&index).unwrap();
+    }
+} 
