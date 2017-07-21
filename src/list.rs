@@ -19,7 +19,7 @@ pub struct SkipList<K> {
     height_: usize,
 }
 
-impl<K> SkipList<K> {
+impl<K: Default> SkipList<K> {
     #[inline(always)]
     pub fn new(upgrade_probability: f64, max_height: usize)
       -> SkipList<K> {
@@ -31,19 +31,30 @@ impl<K> SkipList<K> {
         assert!(upgrade_probability < 1.0);
         assert!(max_height > 0);
 
-        unsafe {
-            SkipList {
-                // It is ok to create the first node with uninitialized memory,
-                // because it will never be read by the algorithms.
-                head_: Box::into_raw(Box::new(Node::new(std::mem::uninitialized(), max_height))),
-                length_: 0,
-                upgrade_probability_: upgrade_probability,
-                max_height_: max_height,
-                height_: 0,
-            }
+        SkipList {
+            head_: Box::into_raw(Box::new(Node::new(Default::default(), max_height))),
+            length_: 0,
+            upgrade_probability_: upgrade_probability,
+            max_height_: max_height,
+            height_: 0,
         }
     }
 
+
+    #[inline(always)]
+    pub fn clear(&mut self) {
+        *self = Self::new(self.upgrade_probability_, self.max_height_);
+    }
+}
+
+impl<K: Default> Default for SkipList<K> {
+    #[inline(always)]
+    fn default() -> Self {
+        Self::new(0.5, 16)
+    }
+}
+
+impl<K> SkipList<K> {
     #[inline(always)]
     pub fn len(&self) -> usize {
         self.length_
@@ -62,11 +73,6 @@ impl<K> SkipList<K> {
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.length_ == 0
-    }
-
-    #[inline(always)]
-    pub fn clear(&mut self) {
-        *self = Self::new(self.upgrade_probability_, self.max_height_);
     }
 
     // Simulates a random variate with geometric distribution. The idea is that
@@ -88,56 +94,52 @@ impl<K> SkipList<K> {
     }
 }
 
-impl<K: Ord> SkipList<K> {
-    // Finds the node previous to the node that would have 'key', if any.
+impl<K: Ord + std::fmt::Debug> SkipList<K> {
+    // Finds the node previous to the node that would have `key`, if any.
     //
     // This function breaks the mutability correctness, because it takes a const
     // reference to self and returns mutable nodes.
-    fn find_lower_bound(&self, key: &K) -> &mut Node<K> {
-        unsafe {
-            let mut current = self.head_;
-            for height in (0..self.height_).rev() {
-                while (*current).has_next(height) &&
-                      (*current).next(height).key() < key {
-                    current = (*current).mut_ptr_next(height);
-                }
+    unsafe fn find_lower_bound(&self, key: &K) -> &mut Node<K> {
+        let mut current = self.head_;
+        for height in (0..self.height_).rev() {
+            while (*current).has_next(height) &&
+                  (*current).next(height).key() < key {
+                current = (*current).mut_ptr_next(height);
             }
-
-            &mut *current
         }
+
+        &mut *current
     }
 
-    // Finds the node previous to the node that would have 'key', if any. It
-    // also generates an "updates" vector; the vector contains for index i, the
+    // Finds the node previous to the node that would have `key`, if any. It
+    // also generates an `updates` vector; the vector contains for index i, the
     // last previous node that had height greater or equal than i.
     //
     // This function breaks the mutability correctness, because it takes a const
     // reference to self and returns mutable nodes.
-    fn find_lower_bound_with_updates(&self, key: &K)
+    unsafe fn find_lower_bound_with_updates(&self, key: &K)
       -> (&mut Node<K>, Vec<&mut Node<K>>) {
-        unsafe {
-            let mut updates = Vec::with_capacity(self.max_height_);
-            // Initialization for the 'updates' vector starts from the back and
-            // moves into the front. We set the length of the uninitialized
-            // vector to the actual value we are going to use, so that we can do
-            // this initialization efficiently
-            updates.set_len(self.max_height_);
-            for height in self.height_..self.max_height_ {
-                updates[height] = &mut *self.head_;
-            }
-
-            let mut current = self.head_;
-            for height in (0..self.height_).rev() {
-                while (*current).has_next(height) &&
-                      (*current).next(height).key() < key {
-                    current = (*current).mut_ptr_next(height);
-                }
-
-                updates[height] = &mut *current;
-            }
-
-            (&mut *current, updates)
+        let mut updates = Vec::with_capacity(self.max_height_);
+        // Initialization for the `updates` vector starts from the back and
+        // moves into the front. We set the length of the uninitialized
+        // vector to the actual value we are going to use, so that we can do
+        // this initialization efficiently
+        updates.set_len(self.max_height_);
+        for height in self.height_..self.max_height_ {
+            updates[height] = &mut *self.head_;
         }
+
+        let mut current = self.head_;
+        for height in (0..self.height_).rev() {
+            while (*current).has_next(height) &&
+                  (*current).next(height).key() < key {
+                current = (*current).mut_ptr_next(height);
+            }
+
+            updates[height] = &mut *current;
+        }
+
+        (&mut *current, updates)
     }
 
     pub fn insert(&mut self, key: K) -> bool {
@@ -160,7 +162,7 @@ impl<K: Ord> SkipList<K> {
             // Generate the node. All memory allocation is done using Box so
             // that we can actually free it using Box later
             let node = Box::into_raw(Box::new(Node::new(key, height)));
-            for h in 0..height + 1 {
+            for h in 0..std::cmp::max(height, 1) {
                 (*node).set_next(h, updates[h].mut_ptr_next(h));
                 updates[h].set_next(h, node);
             }
@@ -172,15 +174,17 @@ impl<K: Ord> SkipList<K> {
     }
 
     pub fn get(&self, key: &K) -> Option<&K> {
-        let mut node : &Node<K> = self.find_lower_bound(key);
-        if node.has_next(0) {
-            node = node.next(0);
-            if node.key() == key {
-                return Some(node.key());
+        let node : &Node<K> = unsafe { self.find_lower_bound(key) };
+        match node.next_or(0) {
+            None => None,
+            Some(next) => {
+                if next.key() == key {
+                    Some(next.key())
+                } else {
+                    None
+                }
             }
         }
-
-        None
     }
 
     #[inline(always)]
@@ -208,9 +212,7 @@ impl<K: Ord> SkipList<K> {
                 return false
             }
 
-            // Since the range is a [,) operation, we need to add one to the
-            // height
-            for h in 0..(*next).height() + 1 {
+            for h in 0..std::cmp::max((*next).height(), 1) {
                 updates[h].set_next(h, (*next).mut_ptr_next(h));
             }
 
@@ -224,7 +226,7 @@ impl<K: Ord> SkipList<K> {
     }
 
     pub fn replace(&mut self, key: K) -> Option<K> {
-        let current = self.find_lower_bound(&key);
+        let current = unsafe { self.find_lower_bound(&key) };
 
         // 'current' is the lower bound to the node, so if it doesn't have a
         // next node at level 0, it means that 'key' is not present. If it
@@ -247,7 +249,7 @@ impl<K: Ord> SkipList<K> {
     // TODO(jbayardo): implement range
 }
 
-impl<K: Display> Display for SkipList<K> {
+impl<K: Display + std::fmt::Debug> Display for SkipList<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "[ ").unwrap();
 
@@ -275,7 +277,7 @@ impl<K> Drop for SkipList<K> {
     }
 }
 
-impl<K: Ord> std::ops::Index<K> for SkipList<K> {
+impl<K: Ord + std::fmt::Debug> std::ops::Index<K> for SkipList<K> {
     type Output = K;
 
     #[inline(always)]

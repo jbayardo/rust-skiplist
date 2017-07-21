@@ -8,23 +8,20 @@ mod iter;
 pub use list::SkipList;
 pub use iter::SkipListIter;
 
-#[macro_use]
-extern crate log;
-extern crate env_logger;
-
 fn main() {
-	::std::env::set_var("RUST_LOG", "debug");
-	env_logger::init().unwrap();
-	let mut sk : SkipList<u32> = SkipList::new(0.5, 16);
+	let mut sk : SkipList<i32> = SkipList::new(0.5, 4);
 
-	let mut k = 50;
-	while k > 0 {
+	println!("{}", sk);
+
+	let mut k : i32 = 5;
+	while k >= 0 {
+		println!("Inserting element {}", k);
 		sk.insert(k);
 		println!("{}", sk);
 		k -= 1;
 	}
 
-	let k : u32 = 3;
+	let k : i32 = 3;
 	println!("{:?}", sk.get(&k));
 	println!("{:?}", sk.remove(&k));
 	println!("{:?}", sk.get(&k));

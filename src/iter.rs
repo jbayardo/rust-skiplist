@@ -3,46 +3,59 @@ use list::SkipList;
 
 use std;
 
+#[derive(Debug)]
 pub struct SkipListIter<'a, K: 'a> {
 	current_: *const Node<K>,
-	phantom_: std::marker::PhantomData<&'a K>,
+	length_: usize,
+	// We need this phantom data to ensure that the references returned by the
+	// SkipListIter's `next` function will have the correct lifetime
+	phantom_: std::marker::PhantomData<&'a Node<K>>,
 }
 
-// TODO: attempt to convert all of this into safe rust??
 impl<'a, K> SkipListIter<'a, K> {
-	pub fn new(item: &'a SkipList<K>) -> SkipListIter<'a, K> {
-		unsafe {
-			SkipListIter {
-				// 'current_' will be null if the list is empty
-				current_: (*item.head_).ptr_next(0),
-				phantom_: std::marker::PhantomData,
-			}
+	#[inline(always)]
+	fn new(item: &'a SkipList<K>) -> SkipListIter<'a, K> {
+		SkipListIter {
+			// If `item` is an empty skip list, this will actually be a nullptr,
+			// if not, then it will be a pointer to the first node.
+			current_: unsafe { (*item.head_).ptr_next(0) },
+			length_: item.len(),
+			phantom_: std::marker::PhantomData,
 		}
 	}
 }
 
-impl<'a, K: 'a> Iterator for SkipListIter<'a, K> {
+impl<'a, K: 'a + std::fmt::Debug> Iterator for SkipListIter<'a, K> {
 	type Item = &'a K;
 
 	fn next(&mut self) -> Option<Self::Item> {
-		// We have reached the end of the list
-		if self.current_.is_null() {
+		if self.length_ == 0 {
 			return None;
 		}
 
-		unsafe {
-			let c : &Node<K> = &*self.current_;
-			if c.has_next(0) {
-				self.current_ = c.ptr_next(0);
-				Some(c.key())
-			} else {
-				None
-			}
-		}
+		let current = unsafe { &*self.current_ };
+		let output = current.key();
+		self.current_ = current.ptr_next(0);
+		self.length_ -= 1;
+		Some(output)
+	}
+
+	#[inline(always)]
+	fn size_hint(&self) -> (usize, Option<usize>) {
+		// We return a None in the second argument of the iterator because a
+		// user may insert elements that end up landing after the exact place
+		// we got to.
+		(self.length_, Some(self.length_))
+	}
+
+	#[inline(always)]
+	fn count(self) -> usize {
+		self.length_
 	}
 }
 
 impl<K> SkipList<K> {
+	#[inline(always)]
 	pub fn iter(&self) -> SkipListIter<K> {
 		SkipListIter::new(self)
 	}

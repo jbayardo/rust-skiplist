@@ -36,6 +36,15 @@ impl<K> Node<K> {
 		unsafe { &*self.forward_[height] }
 	}
 
+	#[inline(always)]
+	pub fn next_or(&self, height: usize) -> Option<&Node<K>> {
+		if self.has_next(height) {
+			Some(unsafe { &*self.forward_[height] })
+		} else {
+			None
+		}
+	}
+
 	// Returns a mutable reference to the underlying node at the given height
 	#[inline(always)]
 	pub fn mut_next(&mut self, height: usize) -> &mut Node<K> {
