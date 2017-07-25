@@ -9,7 +9,12 @@ repository = "https://github.com/jbayardo/rust-skiplist.git"
 readme = "README.md"
 license-file = "LICENSE"
 
-# TODO: add badges
+[badges]
+travis-ci = { repository = "jbayardo/rust-skiplist", branch = "master" }
+codecov = { repository = "jbayardo/rust-skiplist", branch = "master", service = "github" }
+is-it-maintained-issue-resolution = { repository = "jbayardo/rust-skiplist" }
+is-it-maintained-open-issues = { repository = "jbayardo/rust-skiplist" }
+
 [dependencies]
 rand = "*"
 log = "*"

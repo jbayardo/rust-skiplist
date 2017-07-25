@@ -1,16 +1,8 @@
-#![crate_type = "bin"]
-#![crate_name = "skiplist"]
+extern crate skiplist;
+use skiplist::*;
 
-mod height_control;
-mod node;
-mod skiplist;
-mod iter;
-mod range;
-
-pub use skiplist::SkipList;
-pub use height_control::*;
-
-fn main() {
+#[test]
+fn insert_and_iterate() {
 	let gn = Box::new(GeometricalGenerator::new(4, 0.5));
 	let mut sk : SkipList<i32> = SkipList::new(gn);
 
