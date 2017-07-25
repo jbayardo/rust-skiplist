@@ -11,6 +11,16 @@ env:
   global:
     - RUST_BACKTRACE=1
     - CODECOV_TOKEN=:uuid-repo-token
+# TODO: fix for more envs from https://github.com/japaric/trust/blob/master/.travis.yml
+# Problem is how to selectively enable sanitizers for architectures. See https://github.com/rust-lang/rust/issues/39699 for support
+matrix:
+  include:
+    # Linux
+    - env: TARGET=x86_64-unknown-linux-gnu
+
+    # OSX
+    - env: TARGET=x86_64-apple-darwin
+      os: osx
 
 
 # All of this is required to run code coverage for out project using CodeCov.
