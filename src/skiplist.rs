@@ -1,56 +1,35 @@
 use node::Node;
+use height_control::HeightControl;
 
 use std;
-use std::mem;
-use std::fmt::{Display};
 
-extern crate rand;
-use self::rand::{random, Open01};
-
-#[derive(Debug)]
 pub struct SkipList<K> {
-    // TODO(jbayardo): pub(crate) syntax when unstable is removed
-    #[doc(hidden)]
-    pub head_: *mut Node<K>,
+    pub(crate) head_: *mut Node<K>,
 
     length_: usize,
-    upgrade_probability_: f64,
-    max_height_: usize,
     height_: usize,
+    controller_: Box<HeightControl<K>>,
 }
 
 impl<K: Default> SkipList<K> {
-    #[inline(always)]
-    pub fn new(upgrade_probability: f64, max_height: usize)
-      -> SkipList<K> {
+    pub fn new(controller: Box<HeightControl<K>>) -> SkipList<K> {
         // This assertion is here because using Zero Sized Types requires
         // special handling which hasn't been implemented yet.
-        assert!(mem::size_of::<K>() != 0, "We're not ready to handle ZSTs");
-
-        assert!(upgrade_probability > 0.0);
-        assert!(upgrade_probability < 1.0);
-        assert!(max_height > 0);
+        assert!(std::mem::size_of::<K>() != 0, "We're not ready to handle ZSTs");
 
         SkipList {
-            head_: Box::into_raw(Box::new(Node::new(Default::default(), max_height))),
+            head_: Box::into_raw(Box::new(Node::new(Default::default(), controller.max_height()))),
             length_: 0,
-            upgrade_probability_: upgrade_probability,
-            max_height_: max_height,
             height_: 0,
+            controller_: controller,
         }
     }
 
 
     #[inline(always)]
     pub fn clear(&mut self) {
-        *self = Self::new(self.upgrade_probability_, self.max_height_);
-    }
-}
-
-impl<K: Default> Default for SkipList<K> {
-    #[inline(always)]
-    fn default() -> Self {
-        Self::new(0.5, 16)
+        // TODO: reimplement...
+        //*self = Self::new(self.controller_);
     }
 }
 
@@ -61,45 +40,17 @@ impl<K> SkipList<K> {
     }
 
     #[inline(always)]
-    pub fn upgrade_probability(&self) -> f64 {
-        self.upgrade_probability_
-    }
-
-    #[inline(always)]
-    pub fn max_height(&self) -> usize {
-        self.max_height_
-    }
-
-    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.length_ == 0
     }
-
-    // Simulates a random variate with geometric distribution. The idea is that
-    // we are modelling number of successes until first failure, where success
-    // probability
-    fn random_height(&self) -> usize {
-        let mut h = 0;
-
-        while h < self.max_height_ {
-            let Open01(throw) = random::<Open01<f64>>();
-            if throw >= self.upgrade_probability_ {
-                return h;
-            }
-
-            h += 1;
-        }
-
-        h
-    }
 }
 
-impl<K: Ord + std::fmt::Debug> SkipList<K> {
+impl<K: Ord> SkipList<K> {
     // Finds the node previous to the node that would have `key`, if any.
     //
     // This function breaks the mutability correctness, because it takes a const
     // reference to self and returns mutable nodes.
-    unsafe fn find_lower_bound(&self, key: &K) -> &mut Node<K> {
+    pub(crate) unsafe fn find_lower_bound(&self, key: &K) -> &mut Node<K> {
         let mut current = self.head_;
         for height in (0..self.height_).rev() {
             while (*current).has_next(height) &&
@@ -117,15 +68,16 @@ impl<K: Ord + std::fmt::Debug> SkipList<K> {
     //
     // This function breaks the mutability correctness, because it takes a const
     // reference to self and returns mutable nodes.
-    unsafe fn find_lower_bound_with_updates(&self, key: &K)
+    pub(crate) unsafe fn find_lower_bound_with_updates(&self, key: &K)
       -> (&mut Node<K>, Vec<&mut Node<K>>) {
-        let mut updates = Vec::with_capacity(self.max_height_);
+        let max_height = self.controller_.max_height();
+        let mut updates = Vec::with_capacity(max_height);
         // Initialization for the `updates` vector starts from the back and
         // moves into the front. We set the length of the uninitialized
         // vector to the actual value we are going to use, so that we can do
         // this initialization efficiently
-        updates.set_len(self.max_height_);
-        for height in self.height_..self.max_height_ {
+        updates.set_len(max_height);
+        for height in self.height_..max_height {
             updates[height] = &mut *self.head_;
         }
 
@@ -143,7 +95,9 @@ impl<K: Ord + std::fmt::Debug> SkipList<K> {
     }
 
     pub fn insert(&mut self, key: K) -> bool {
-        let height;
+        // TODO: initialize this later. This may not ever get used if the key
+        // already exists
+        let height = self.controller_.get_height(&key);
 
         unsafe {
             let (current, mut updates)
@@ -156,8 +110,6 @@ impl<K: Ord + std::fmt::Debug> SkipList<K> {
                     return false;
                 }
             }
-
-            height = self.random_height();
 
             // Generate the node. All memory allocation is done using Box so
             // that we can actually free it using Box later
@@ -245,11 +197,9 @@ impl<K: Ord + std::fmt::Debug> SkipList<K> {
 
         return Some(next.replace_key(key))
     }
-
-    // TODO(jbayardo): implement range
 }
 
-impl<K: Display + std::fmt::Debug> Display for SkipList<K> {
+impl<K: std::fmt::Display> std::fmt::Display for SkipList<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "[ ").unwrap();
 
@@ -277,11 +227,110 @@ impl<K> Drop for SkipList<K> {
     }
 }
 
-impl<K: Ord + std::fmt::Debug> std::ops::Index<K> for SkipList<K> {
+impl<K: Ord> std::ops::Index<K> for SkipList<K> {
     type Output = K;
 
     #[inline(always)]
     fn index(&self, index: K) -> &Self::Output {
         return self.get(&index).unwrap();
     }
-} 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_empty() {
+        // let k_upgrade_probability = 0.5;
+        // let k_max_height = 3;
+        // let list : SkipList<u32> =
+        //     SkipList::new(k_upgrade_probability, k_max_height);
+        // assert_eq!(list.len(), 0);
+        // assert_eq!(list.upgrade_probability(), k_upgrade_probability);
+        // assert_eq!(list.max_height(), k_max_height);
+        // assert!(list.is_empty());
+    }
+
+    #[test]
+    fn insert_single_clear() {
+        // let k_upgrade_probability = 0.7;
+        // let k_max_height = 8;
+        // let mut list : SkipList<i32> =
+        //     SkipList::new(k_upgrade_probability, k_max_height);
+        // assert!(list.insert(34));
+        // assert_eq!(list.len(), 1);
+        // assert!(!list.is_empty());
+
+        // list.clear();
+        // assert_eq!(list.len(), 0);
+        // assert_eq!(list.upgrade_probability(), k_upgrade_probability);
+        // assert_eq!(list.max_height(), k_max_height);
+        // assert!(list.is_empty());
+    }
+
+    #[test]
+    fn insert_already_exists() {
+
+    }
+
+    #[test]
+    fn insert_multiple() {
+
+    }
+
+    #[test]
+    fn get_single() {
+
+    }
+
+    #[test]
+    fn get_multiple() {
+
+    }
+
+    #[test]
+    fn get_not_found() {
+
+    }
+
+    #[test]
+    fn remove_from_empty() {
+
+    }
+
+    #[test]
+    fn remove_not_found() {
+
+    }
+
+    #[test]
+    fn remove_from_single() {
+
+    }
+
+    #[test]
+    fn remove_from_multiple() {
+
+    }
+
+    #[test]
+    fn replace_from_empty() {
+
+    }
+
+    #[test]
+    fn replace_not_found() {
+
+    }
+
+    #[test]
+    fn replace_from_single() {
+
+    }
+
+    #[test]
+    fn replace_from_multiple() {
+
+    }
+}

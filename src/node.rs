@@ -2,7 +2,7 @@ use std;
 use std::ops::{Index};
 
 #[derive(Debug)]
-pub struct Node<K> {
+pub(crate) struct Node<K> {
 	forward_: std::vec::Vec<*mut Node<K>>,
 	key_: K,
 }
@@ -85,10 +85,30 @@ impl<K> Node<K> {
 	pub fn replace_key(&mut self, key : K) -> K {
 		std::mem::replace(&mut self.key_, key)
 	}
+}
 
-	#[inline(always)]
-	pub fn clear(&mut self) {
-		let height = self.forward_.capacity();
-		self.forward_ = vec![std::ptr::null_mut(); height + 1];
-	}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new() {
+
+    }
+
+    #[test]
+    fn set_next() {
+
+    }
+
+    #[test]
+    fn replace_key() {
+
+    }
+
+    #[test]
+    fn clear() {
+    	
+    }
 }

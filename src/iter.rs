@@ -1,5 +1,5 @@
 use node::Node;
-use list::SkipList;
+use skiplist::SkipList;
 
 use std;
 
@@ -13,19 +13,25 @@ pub struct SkipListIter<'a, K: 'a> {
 }
 
 impl<'a, K> SkipListIter<'a, K> {
-	#[inline(always)]
-	fn new(item: &'a SkipList<K>) -> SkipListIter<'a, K> {
+	pub(crate) fn new(list: &'a SkipList<K>) -> SkipListIter<'a, K> {
 		SkipListIter {
-			// If `item` is an empty skip list, this will actually be a nullptr,
+			// If `list` is an empty skip list, this will actually be a nullptr,
 			// if not, then it will be a pointer to the first node.
-			current_: unsafe { (*item.head_).ptr_next(0) },
-			length_: item.len(),
+			current_: unsafe { (*list.head_).ptr_next(0) },
+			length_: list.len(),
 			phantom_: std::marker::PhantomData,
 		}
 	}
 }
 
-impl<'a, K: 'a + std::fmt::Debug> Iterator for SkipListIter<'a, K> {
+impl<K> SkipList<K> {
+	#[inline(always)]
+	pub fn iter(&self) -> SkipListIter<K> {
+		SkipListIter::new(self)
+	}
+}
+
+impl<'a, K: 'a> Iterator for SkipListIter<'a, K> {
 	type Item = &'a K;
 
 	fn next(&mut self) -> Option<Self::Item> {
@@ -45,6 +51,7 @@ impl<'a, K: 'a + std::fmt::Debug> Iterator for SkipListIter<'a, K> {
 		// We return a None in the second argument of the iterator because a
 		// user may insert elements that end up landing after the exact place
 		// we got to.
+		// TODO: test if the user can indeed insert while an iterator is ongoing
 		(self.length_, Some(self.length_))
 	}
 
@@ -52,11 +59,12 @@ impl<'a, K: 'a + std::fmt::Debug> Iterator for SkipListIter<'a, K> {
 	fn count(self) -> usize {
 		self.length_
 	}
-}
 
-impl<K> SkipList<K> {
-	#[inline(always)]
-	pub fn iter(&self) -> SkipListIter<K> {
-		SkipListIter::new(self)
+	fn min(self) -> Option<Self::Item> {
+		if self.length_ == 0 {
+			None
+		} else {
+			Some(unsafe { (*self.current_).key() })
+		}
 	}
 }

@@ -2,7 +2,14 @@
 name = "skiplist"
 version = "0.1.0"
 authors = ["Julian Bayardo <julian@bayardo.info>"]
+publish = false
+description = ""
+homepage = "https://github.com/jbayardo/rust-skiplist"
+repository = "https://github.com/jbayardo/rust-skiplist.git"
+readme = "README.md"
+license-file = "LICENSE"
 
+# TODO: add badges
 [dependencies]
 rand = "*"
 log = "*"
