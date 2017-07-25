@@ -10,15 +10,15 @@ env:
 
 # TODO: add envs from https://github.com/japaric/trust/blob/master/.travis.yml
 matrix:
-  env:
   allow_failures:
     - rust: beta
 
   include:
     # These are the targets we support
     - env: TARGET=x86_64-unknown-linux-gnu
-    - env: TARGET=x86_64-apple-darwin
-      os: osx
+    # TODO: osx build is too slow, so it has been disabled.
+    #- env: TARGET=x86_64-apple-darwin
+    #  os: osx
 
     # Sanitizers are available only for select architectures. See tracking bug
     # at https://github.com/rust-lang/rust/issues/39699 . For usage, it is
