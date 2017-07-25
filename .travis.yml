@@ -2,30 +2,55 @@ language: rust
 sudo: false
 rust:
   - nightly
+  - beta
 env:
   global:
     - RUST_BACKTRACE=1
     - CODECOV_TOKEN=:uuid-repo-token
-# TODO: fix for more envs from https://github.com/japaric/trust/blob/master/.travis.yml
-# Problem is how to selectively enable sanitizers for architectures. See https://github.com/rust-lang/rust/issues/39699 for support
+# TODO: add envs from https://github.com/japaric/trust/blob/master/.travis.yml
 matrix:
+  allow_failures:
+    - rust: beta
+
   include:
+    # Sanitizers are available only for select architectures. See tracking bug
+    # at https://github.com/rust-lang/rust/issues/39699
     # Linux
     - env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=address"
+      script:
+        - cargo run --target x86_64-unknown-linux-gnu
+        - cargo test --target x86_64-unknown-linux-gnu
     - env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=memory"
+      script:
+        - cargo run --target x86_64-unknown-linux-gnu
+        - cargo test --target x86_64-unknown-linux-gnu
     - env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=leak"
+      script:
+        - cargo run --target x86_64-unknown-linux-gnu
+        - cargo test --target x86_64-unknown-linux-gnu
     - env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=thread"
+      script:
+        - cargo run --target x86_64-unknown-linux-gnu
+        - cargo test --target x86_64-unknown-linux-gnu
     - env: TARGET=x86_64-unknown-linux-gnu
 
     # OSX
     - env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=address"
       os: osx
-    - env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=memory"
-      os: osx
-    - env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=leak"
-      os: osx
+      script:
+        - cargo run --target x86_64-apple-darwin
+        - cargo test --target x86_64-apple-darwin
+    # TODO: Memory sanitizer works only with x86_64-unknown-linux-gnu
+    #- env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=memory"
+    #  os: osx
+    # TODO: Leak sanitizer works only with x86_64-unknown-linux-gnu
+    #- env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=leak"
+    #  os: osx
     - env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=thread"
       os: osx
+      script:
+        - cargo run --target x86_64-apple-darwin
+        - cargo test --target x86_64-apple-darwin
     - env: TARGET=x86_64-apple-darwin
       os: osx
 

@@ -1,7 +1,6 @@
 use std;
 use std::ops::{Index};
 
-#[derive(Debug)]
 pub(crate) struct Node<K> {
 	forward_: std::vec::Vec<*mut Node<K>>,
 	key_: K,

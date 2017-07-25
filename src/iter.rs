@@ -3,7 +3,6 @@ use skiplist::SkipList;
 
 use std;
 
-#[derive(Debug)]
 pub struct SkipListIter<'a, K: 'a> {
 	current_: *const Node<K>,
 	length_: usize,
