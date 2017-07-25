@@ -7,53 +7,76 @@ env:
   global:
     - RUST_BACKTRACE=1
     - CODECOV_TOKEN=:uuid-repo-token
+
 # TODO: add envs from https://github.com/japaric/trust/blob/master/.travis.yml
 matrix:
+  env:
   allow_failures:
     - rust: beta
 
   include:
-    # Sanitizers are available only for select architectures. See tracking bug
-    # at https://github.com/rust-lang/rust/issues/39699
-    # Linux
-    - env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=address"
-      script:
-        - cargo run --target x86_64-unknown-linux-gnu
-        - cargo test --target x86_64-unknown-linux-gnu
-    - env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=memory"
-      script:
-        - cargo run --target x86_64-unknown-linux-gnu
-        - cargo test --target x86_64-unknown-linux-gnu
-    - env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=leak"
-      script:
-        - cargo run --target x86_64-unknown-linux-gnu
-        - cargo test --target x86_64-unknown-linux-gnu
-    - env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=thread"
-      script:
-        - cargo run --target x86_64-unknown-linux-gnu
-        - cargo test --target x86_64-unknown-linux-gnu
+    # These are the targets we support
     - env: TARGET=x86_64-unknown-linux-gnu
-
-    # OSX
-    - env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=address"
-      os: osx
-      script:
-        - cargo run --target x86_64-apple-darwin
-        - cargo test --target x86_64-apple-darwin
-    # TODO: Memory sanitizer works only with x86_64-unknown-linux-gnu
-    #- env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=memory"
-    #  os: osx
-    # TODO: Leak sanitizer works only with x86_64-unknown-linux-gnu
-    #- env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=leak"
-    #  os: osx
-    - env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=thread"
-      os: osx
-      script:
-        - cargo run --target x86_64-apple-darwin
-        - cargo test --target x86_64-apple-darwin
     - env: TARGET=x86_64-apple-darwin
       os: osx
 
+    # Sanitizers are available only for select architectures. See tracking bug
+    # at https://github.com/rust-lang/rust/issues/39699 . For usage, it is
+    # required to have the environment variable RUSTFLAGS="-Z sanitizer=...",
+    # and cargo has to run with the --target <target> flag.
+    #
+    # TODO: currently disabled because they don't work correctly on Travis-CI.
+    # Linux
+    #- env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=address"
+    #  script:
+    #    - cargo run --target x86_64-unknown-linux-gnu
+    #    - cargo test --target x86_64-unknown-linux-gnu
+    #
+    #- env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=memory"
+    #  script:
+    #    - cargo run --target x86_64-unknown-linux-gnu
+    #    - cargo test --target x86_64-unknown-linux-gnu
+    # 
+    #- env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=leak" LSAN_OPTIONS=verbosity=1:log_threads=1
+    #  script:
+    #    - cargo run --target x86_64-unknown-linux-gnu
+    #    - cargo test --target x86_64-unknown-linux-gnu
+    # 
+    # There is no need for this right now. Might need it later when adapting the
+    # list for concurrency
+    #- env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=thread"
+    #  script:
+    #    - cargo run --target x86_64-unknown-linux-gnu
+    #    - cargo test --target x86_64-unknown-linux-gnu
+    #
+    # OSX
+    #- env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=address"
+    #  os: osx
+    #  script:
+    #    - cargo run --target x86_64-apple-darwin
+    #    - cargo test --target x86_64-apple-darwin
+    # 
+    # There is no need for this right now. Might need it later when adapting the
+    # list for concurrency
+    #- env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=thread"
+    #  os: osx
+    #  script:
+    #    - cargo run --target x86_64-apple-darwin
+    #    - cargo test --target x86_64-apple-darwin
+    #
+    # TODO: Memory sanitizer works only with x86_64-unknown-linux-gnu
+    #- env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=memory"
+    #  os: osx
+    #  script:
+    #    - cargo run --target x86_64-apple-darwin
+    #    - cargo test --target x86_64-apple-darwin
+    # 
+    # TODO: Leak sanitizer works only with x86_64-unknown-linux-gnu
+    #- env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=leak"
+    #  os: osx
+    #  script:
+    #    - cargo run --target x86_64-apple-darwin
+    #    - cargo test --target x86_64-apple-darwin
 
 # All of this is required to run code coverage for out project using CodeCov.
 # See https://github.com/codecov/example-rust
