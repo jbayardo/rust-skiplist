@@ -3,11 +3,6 @@ sudo: false
 rust:
   - nightly
 env:
-  matrix:
-    - RUSTFLAGS="-Z sanitizer=address"
-    - RUSTFLAGS="-Z sanitizer=memory"
-    - RUSTFLAGS="-Z sanitizer=leak"
-    - RUSTFLAGS="-Z sanitizer=thread"
   global:
     - RUST_BACKTRACE=1
     - CODECOV_TOKEN=:uuid-repo-token
@@ -16,9 +11,21 @@ env:
 matrix:
   include:
     # Linux
+    - env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=address"
+    - env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=memory"
+    - env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=leak"
+    - env: TARGET=x86_64-unknown-linux-gnu RUSTFLAGS="-Z sanitizer=thread"
     - env: TARGET=x86_64-unknown-linux-gnu
 
     # OSX
+    - env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=address"
+      os: osx
+    - env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=memory"
+      os: osx
+    - env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=leak"
+      os: osx
+    - env: TARGET=x86_64-apple-darwin RUSTFLAGS="-Z sanitizer=thread"
+      os: osx
     - env: TARGET=x86_64-apple-darwin
       os: osx
 
