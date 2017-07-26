@@ -6,7 +6,6 @@ rust:
 env:
   global:
     - RUST_BACKTRACE=1
-    - CODECOV_TOKEN=:uuid-repo-token
 
 # TODO: add envs from https://github.com/japaric/trust/blob/master/.travis.yml
 matrix:
