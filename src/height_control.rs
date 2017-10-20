@@ -17,20 +17,20 @@ use self::rand::{random, Open01};
 /// space or speed concerns and they are certain that a change in the strategy
 /// will fix their problem.
 pub trait HeightControl<K> {
-	/// Returns the maximum height that this controller can generate. This value
-	/// must be constant per instance: implementors of this trait should not
-	/// allow the output of this function to ever change after an instance has
-	/// been created.
-	/// 
-	/// # Remarks
-	/// 
-	/// This is used by the Skip List to decide how much space to allocate for
-	/// the head node. The impact of this value is very high: every search in
-	/// the skip list needs to allocate a vector of the size given by this
-	/// function. Searches happen in every action on it except for iteration.
-	///
-	/// It is also called very frequently, which means that it should ideally be
-	/// both inlineable and O(1).
+    /// Returns the maximum height that this controller can generate. This value
+    /// must be constant per instance: implementors of this trait should not
+    /// allow the output of this function to ever change after an instance has
+    /// been created.
+    ///
+    /// # Remarks
+    ///
+    /// This is used by the Skip List to decide how much space to allocate for
+    /// the head node. The impact of this value is very high: every search in
+    /// the skip list needs to allocate a vector of the size given by this
+    /// function. Searches happen in every action on it except for iteration.
+    ///
+    /// It is also called very frequently, which means that it should ideally be
+    /// both inlineable and O(1).
     fn max_height(&self) -> usize;
 
     /// Generates a height for the `key`.
@@ -50,7 +50,7 @@ pub trait HeightControl<K> {
     /// to keep in mind:
     ///
     ///  1. It is called in every insertion. Ideally, it should be O(1).
-    ///  2. High values for this function mean more pointers between nodes and 
+    ///  2. High values for this function mean more pointers between nodes and
     ///     bigger vectors.
     ///  3. Nodes of a given level will all be linked between themselves, so it
     ///     also affects the search strategy.
@@ -76,19 +76,19 @@ pub struct GeometricalGenerator {
 }
 
 impl GeometricalGenerator {
-	/// Builds a new `GeometricalGenerator`
-	///
-	/// # Arguments
-	///
-	///  * `max_height`: maximum height that the generator may give out to any
-	///    node.
-	///  * `upgrade_probability`: the probability used when simulating the
-	///    geometrical random variable.
-	///
-	/// # Remarks
-	///
-	/// This generator uses an RNG to simulate up to `max_heights` coin throws
-	/// in every `get_height` call. This is slow, so it should be avoided.
+    /// Builds a new `GeometricalGenerator`
+    ///
+    /// # Arguments
+    ///
+    ///  * `max_height`: maximum height that the generator may give out to any
+    ///    node.
+    ///  * `upgrade_probability`: the probability used when simulating the
+    ///    geometrical random variable.
+    ///
+    /// # Remarks
+    ///
+    /// This generator uses an RNG to simulate up to `max_heights` coin throws
+    /// in every `get_height` call. This is slow, so it should be avoided.
     pub fn new(max_height: usize, upgrade_probability: f64) -> GeometricalGenerator {
         GeometricalGenerator {
             upgrade_probability_: upgrade_probability,
@@ -135,25 +135,25 @@ pub struct HashCoinGenerator<K, H> {
 }
 
 impl<K: std::hash::Hash, H: std::hash::Hasher> HashCoinGenerator<K, H> {
-	/// Builds a new `HashCoinGenerator`
-	///
-	/// # Arguments
-	///
-	///  * `max_height`: maximum height that the generator may give out to any
-	///    node.
-	///  * `hasher`: the hash function that will be used to generate the level
-	///    for a node. This should be from at least a 2-universal family.
-	///
-	/// # Remarks
-	///
-	/// The implementation can not and does not check for 2-universality on the
-	/// hash function. A bad hash function may skew the generated heights
-	/// towards bad distribution values and, in doing so, unbalance the skip
-	/// list and affect its guarantees.
-	///
-	/// As an example, if using this generator to build `u32` keys, and the
-	/// hash function is the identity function, the `get_height` function will
-	/// entirely depend on the input distribution.
+    /// Builds a new `HashCoinGenerator`
+    ///
+    /// # Arguments
+    ///
+    ///  * `max_height`: maximum height that the generator may give out to any
+    ///    node.
+    ///  * `hasher`: the hash function that will be used to generate the level
+    ///    for a node. This should be from at least a 2-universal family.
+    ///
+    /// # Remarks
+    ///
+    /// The implementation can not and does not check for 2-universality on the
+    /// hash function. A bad hash function may skew the generated heights
+    /// towards bad distribution values and, in doing so, unbalance the skip
+    /// list and affect its guarantees.
+    ///
+    /// As an example, if using this generator to build `u32` keys, and the
+    /// hash function is the identity function, the `get_height` function will
+    /// entirely depend on the input distribution.
     pub fn new(max_height: usize, hasher: H) -> HashCoinGenerator<K, H> {
         HashCoinGenerator {
             max_height_: max_height,
@@ -186,7 +186,7 @@ impl<K: std::hash::Hash, H: std::hash::Hasher> HeightControl<K> for HashCoinGene
 /// random variable, similar to `GeometricalGenerator`. This generator is
 /// restricted to maximum heights that are powers of two and upgrades with
 /// probability 1/2.
-/// 
+///
 /// It should be preferred to `GeometricalGenerator` because the simulation is
 /// done using only a single random throw.
 pub struct TwoPowGenerator<K> {
@@ -196,7 +196,7 @@ pub struct TwoPowGenerator<K> {
 
 impl<K> TwoPowGenerator<K> {
     pub fn new(max_height: usize) -> TwoPowGenerator<K> {
-    	assert!(max_height.is_power_of_two());
+        assert!(max_height.is_power_of_two());
 
         TwoPowGenerator {
             max_pow_: max_height - 1,
@@ -213,8 +213,8 @@ impl<K> HeightControl<K> for TwoPowGenerator<K> {
 
     #[allow(unused_variables)]
     fn get_height(&mut self, key: &K) -> usize {
-    	// The probability that a random value has a binary representation that
-    	// ends with 1 0^k is (1/2)^{k+1}.
+        // The probability that a random value has a binary representation that
+        // ends with 1 0^k is (1/2)^{k+1}.
         let height = random::<usize>().trailing_zeros() as usize;
         // Since we are always doing `% 2^k` here, we are using the simple trick
         // exposed here: https://stackoverflow.com/q/6670715 .

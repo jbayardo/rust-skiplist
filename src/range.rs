@@ -61,7 +61,7 @@
 // 						start_ptr = std::ptr::null();
 // 					}
 // 					Some(next) => {
-// 						// We have a next node. Ensure it is 
+// 						// We have a next node. Ensure it is
 // 					}
 // 				}
 // 			}
