@@ -33,10 +33,7 @@ impl<K: Default> SkipList<K> {
     pub fn new(controller: Box<HeightControl<K>>) -> SkipList<K> {
         // This assertion is here because using Zero Sized Types requires
         // special handling which hasn't been implemented yet.
-        assert!(
-            std::mem::size_of::<K>() != 0,
-            "We're not ready to handle ZSTs"
-        );
+        assert_ne!(std::mem::size_of::<K>(), 0);
 
         SkipList {
             // This is the ghost node mentioned above. The fact that we need a dummy
@@ -88,14 +85,18 @@ impl<K: Ord> SkipList<K> {
     /// This function breaks the mutability correctness, because it takes a const
     /// reference to self and returns mutable nodes.
     pub(crate) unsafe fn find_lower_bound(&self, key: &K) -> &mut Node<K> {
-        let mut current = self.head_;
+        let mut current_ptr = self.head_;
         for height in (0..self.height_).rev() {
-            while (*current).has_next(height) && (*current).next(height).key() < key {
-                current = (*current).mut_ptr_next(height);
+            while let Some(next_ptr) = (*current_ptr).mut_next(height) {
+                if (*next_ptr).key() < key {
+                    current_ptr = next_ptr;
+                } else {
+                    break
+                }
             }
         }
 
-        &mut *current
+        &mut *current_ptr
     }
 
     /// Finds the node previous to the node that would have `key`, if any. It
@@ -110,6 +111,7 @@ impl<K: Ord> SkipList<K> {
     ) -> (&mut Node<K>, Vec<&mut Node<K>>) {
         let max_height = self.max_height();
         let mut updates = Vec::with_capacity(max_height);
+
         // Initialization for the `updates` vector starts from the back and
         // moves into the front. We set the length of the uninitialized
         // vector to the actual value we are going to use, so that we can do
@@ -119,16 +121,20 @@ impl<K: Ord> SkipList<K> {
             updates[height] = &mut *self.head_;
         }
 
-        let mut current = self.head_;
+        let mut current_ptr = self.head_;
         for height in (0..self.height_).rev() {
-            while (*current).has_next(height) && (*current).next(height).key() < key {
-                current = (*current).mut_ptr_next(height);
+            while let Some(next_ptr) = (*current_ptr).mut_next(height) {
+                if (*next_ptr).key() < key {
+                    current_ptr = next_ptr;
+                } else {
+                    break
+                }
             }
 
-            updates[height] = &mut *current;
+            updates[height] = &mut *current_ptr;
         }
 
-        (&mut *current, updates)
+        (&mut *current_ptr, updates)
     }
 
     pub fn insert(&mut self, key: K) -> bool {
@@ -139,20 +145,22 @@ impl<K: Ord> SkipList<K> {
         unsafe {
             let (current, mut updates) = self.find_lower_bound_with_updates(&key);
 
-            // The lower bound's next node, if present, could be the same as the
-            // key we are looking for, so we could abort early here
-            if current.has_next(0) {
-                if current.next(0).key() == &key {
-                    return false;
-                }
-            }
-
-            // Generate the node. All memory allocation is done using Box so
-            // that we can actually free it using Box later
-            let node = Box::into_raw(Box::new(Node::new(key, height)));
-            for h in 0..std::cmp::max(height, 1) {
-                (*node).set_next(h, updates[h].mut_ptr_next(h));
-                updates[h].set_next(h, node);
+            match current.next(0) {
+                None => {
+                    // Generate the node. All memory allocation is done using Box so
+                    // that we can actually free it using Box later
+                    let node = Box::into_raw(Box::new(Node::new(key, height)));
+                    for h in 0..std::cmp::max(height, 1) {
+                        (*node).link_to_next(h, updates[h]);
+                        updates[h].link_to(h, node);
+                    }
+                },
+                Some(next) =>
+                    // The lower bound's next node, if present, could be the same as the
+                    // key we are looking for, so we could abort early here
+                    if (*next).key() == &key {
+                        return false;
+                    }
             }
         }
 
@@ -163,11 +171,14 @@ impl<K: Ord> SkipList<K> {
 
     pub fn get(&self, key: &K) -> Option<&K> {
         let node: &Node<K> = unsafe { self.find_lower_bound(key) };
-        match node.next_or(0) {
+
+        match node.next(0) {
             None => None,
-            Some(next) => {
-                if next.key() == key {
-                    Some(next.key())
+            Some(next_ptr) => {
+                let next_key = unsafe { (*next_ptr).key() };
+
+                if next_key == key {
+                    Some(next_key)
                 } else {
                     None
                 }
@@ -184,27 +195,29 @@ impl<K: Ord> SkipList<K> {
         unsafe {
             let (current, mut updates) = self.find_lower_bound_with_updates(&key);
 
-            // 'current' is the lower bound to the node, so if it doesn't have a
-            // next node at level 0, it means that 'key' is not present. If it
-            // does exist, then there is a possibility that it may be greater
-            // than the actual key we are looking for
-            if !current.has_next(0) {
-                return false;
-            }
+            match current.mut_next(0) {
+                // 'current' is the lower bound to the node, so if it doesn't have a
+                // next node at level 0, it means that 'key' is not present. If it
+                // does exist, then there is a possibility that it may be greater
+                // than the actual key we are looking for
+                None => return false,
+                Some(next_ptr) => {
+                    let next = &*next_ptr;
 
-            let next = current.mut_ptr_next(0);
-            // If the key is not the one that we are looking for, then that
-            // means we are done too
-            if (*next).key() != key {
-                return false;
-            }
+                    // If the key is not the one that we are looking for, then that
+                    // means we are done
+                    if next.key() != key {
+                        return false;
+                    }
 
-            for h in 0..std::cmp::max((*next).height(), 1) {
-                updates[h].set_next(h, (*next).mut_ptr_next(h));
-            }
+                    for h in 0..std::cmp::max(next.height(), 1) {
+                        updates[h].link_to_next(h, next);
+                    }
 
-            // Free the memory for the 'next' pointer
-            Box::from_raw(next);
+                    // Free the memory for the `next_ptr`
+                    Box::from_raw(next_ptr);
+                }
+            }
         }
 
         // Update length
@@ -215,22 +228,23 @@ impl<K: Ord> SkipList<K> {
     pub fn replace(&mut self, key: K) -> Option<K> {
         let current = unsafe { self.find_lower_bound(&key) };
 
-        // 'current' is the lower bound to the node, so if it doesn't have a
-        // next node at level 0, it means that 'key' is not present. If it
-        // does exist, then there is a possibility that it may be greater
-        // than the actual key we are looking for
-        if !current.has_next(0) {
-            return None;
+        match current.mut_next(0) {
+            // 'current' is the lower bound to the node, so if it doesn't have a
+            // next node at level 0, it means that 'key' is not present. If it
+            // does exist, then there is a possibility that it may be greater
+            // than the actual key we are looking for
+            None => None,
+            Some(next_ptr) => {
+                let next = unsafe { &mut *next_ptr };
+                // If the key is not the one that we are looking for, then that
+                // means we are done too
+                if next.key() != &key {
+                    None
+                } else {
+                    Some(next.replace_key(key))
+                }
+            }
         }
-
-        let next = current.mut_next(0);
-        // If the key is not the one that we are looking for, then that
-        // means we are done too
-        if next.key() != &key {
-            return None;
-        }
-
-        return Some(next.replace_key(key));
     }
 }
 
@@ -251,11 +265,12 @@ impl<K> Drop for SkipList<K> {
     fn drop(&mut self) {
         unsafe {
             let mut current = self.head_;
-            while (*current).has_next(0) {
-                let next = (*current).mut_ptr_next(0);
+
+            while let Some(next) = (*current).mut_next(0) {
                 Box::from_raw(current);
                 current = next;
             }
+
             Box::from_raw(current);
         }
     }

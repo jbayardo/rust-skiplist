@@ -24,56 +24,41 @@ impl<K> Node<K> {
         self.forward_.len() - 1
     }
 
-    #[inline(always)]
-    pub fn has_next(&self, height: usize) -> bool {
-        height < self.forward_.len() && !self.forward_.index(height).is_null()
-    }
-
     // Returns a reference to the underlying node at the given height
     #[inline(always)]
-    pub fn next(&self, height: usize) -> &Node<K> {
-        debug_assert!(self.has_next(height));
-        unsafe { &*self.forward_[height] }
-    }
-
-    #[inline(always)]
-    pub fn next_or(&self, height: usize) -> Option<&Node<K>> {
-        if self.has_next(height) {
-            Some(unsafe { &*self.forward_[height] })
-        } else {
-            None
+    pub fn next(&self, height: usize) -> Option<*const Node<K>> {
+        match self.forward_.get(height) {
+            None => None,
+            Some(ptr) =>
+                if ptr.is_null() {
+                    None
+                } else {
+                    Some(*ptr)
+                }
         }
     }
 
-    // Returns a mutable reference to the underlying node at the given height
     #[inline(always)]
-    pub fn mut_next(&mut self, height: usize) -> &mut Node<K> {
-        debug_assert!(self.has_next(height));
-        unsafe { &mut *self.forward_[height] }
-    }
-
-    #[inline(always)]
-    pub fn ptr_next(&self, height: usize) -> *const Node<K> {
-        if self.has_next(height) {
-            return self.forward_[height];
+    pub fn mut_next(&mut self, height: usize) -> Option<*mut Node<K>> {
+        match self.forward_.get(height) {
+            None => None,
+            Some(ptr) =>
+                if ptr.is_null() {
+                    None
+                } else {
+                    Some(*ptr)
+                }
         }
-
-        std::ptr::null()
     }
 
     #[inline(always)]
-    pub fn mut_ptr_next(&mut self, height: usize) -> *mut Node<K> {
-        if self.has_next(height) {
-            return self.forward_[height];
-        }
-
-        std::ptr::null_mut()
-    }
-
-    #[inline(always)]
-    pub fn set_next(&mut self, height: usize, destination: *mut Node<K>) {
+    pub fn link_to(&mut self, height: usize, destination: *mut Node<K>) {
         debug_assert!(height < self.forward_.len());
         self.forward_[height] = destination;
+    }
+
+    pub fn link_to_next(&mut self, height: usize, node: &Node<K>) {
+        self.forward_[height] = node.forward_[height];
     }
 
     #[inline(always)]
@@ -100,9 +85,9 @@ mod tests {
 
         assert_eq!(*node.key(), k_node_key);
         assert_eq!(node.height(), k_node_height);
+
         for height in 0..k_node_height {
-            assert!(!node.has_next(height));
-            assert!(node.next_or(height).is_none());
+            assert!(node.next(height).is_none());
         }
     }
 
@@ -111,16 +96,19 @@ mod tests {
         let k_node_key = 3;
         let k_node_height = 5;
         let k_node_set_height = 0;
+
         let mut node = Node::new(k_node_key, k_node_height);
         let next_node = Box::into_raw(Box::new(Node::new(k_node_key, k_node_height)));
-        node.set_next(k_node_set_height, next_node);
+        node.link_to(k_node_set_height, next_node);
 
         for h in 0..node.height() {
+            let next = node.mut_next(h);
+
             if h == k_node_set_height {
-                assert_eq!(node.mut_ptr_next(h), next_node);
+                let next_ptr = next.unwrap();
+                assert_eq!(next_ptr, next_node);
             } else {
-                assert!(!node.has_next(h));
-                assert!(node.next_or(h).is_none());
+                assert!(next.is_none());
             }
         }
 

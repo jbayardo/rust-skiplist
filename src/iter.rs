@@ -3,6 +3,27 @@ use skiplist::SkipList;
 
 use std;
 
+pub struct SkipListHeightIter<'a, K: 'a> {
+	height_: usize,
+	current_: *const Node<K>,
+
+	// We need this phantom data to ensure that the references returned by the
+	// SkipListIter's `next` function will have the correct lifetime
+	phantom_: std::marker::PhantomData<&'a Node<K>>,
+}
+
+impl<'a, K> SkipListHeightIter<'a, K> {
+	pub(crate) fn new(list: &'a SkipList<K>, height: usize) -> SkipListHeightIter<'a, K> {
+		SkipListHeightIter {
+			// If `list` is an empty skip list, this will actually be a nullptr,
+			// if not, then it will be a pointer to the first node.
+			current_: unsafe { (*list.head_).next(0).unwrap() },
+			height_: height,
+			phantom_: std::marker::PhantomData,
+		}
+	}
+}
+
 pub struct SkipListIter<'a, K: 'a> {
     current_: *const Node<K>,
     length_: usize,
@@ -16,7 +37,7 @@ impl<'a, K> SkipListIter<'a, K> {
         SkipListIter {
             // If `list` is an empty skip list, this will actually be a nullptr,
             // if not, then it will be a pointer to the first node.
-            current_: unsafe { (*list.head_).ptr_next(0) },
+            current_: unsafe { (*list.head_).next(0).unwrap() },
             length_: list.len(),
             phantom_: std::marker::PhantomData,
         }
@@ -39,10 +60,13 @@ impl<'a, K: 'a> Iterator for SkipListIter<'a, K> {
         }
 
         let current = unsafe { &*self.current_ };
-        let output = current.key();
-        self.current_ = current.ptr_next(0);
+		match current.next(0) {
+			None => self.current_ = std::ptr::null(),
+			Some(next_ptr) => self.current_ = next_ptr
+		}
+
         self.length_ -= 1;
-        Some(output)
+        Some(current.key())
     }
 
     #[inline(always)]
