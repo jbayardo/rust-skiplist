@@ -1,5 +1,4 @@
 use std;
-use std::ops::Index;
 
 #[derive(Debug)]
 pub(crate) struct Node<K> {
@@ -26,49 +25,46 @@ impl<K> Node<K> {
 
     // Returns a reference to the underlying node at the given height
     #[inline(always)]
-    pub fn next(&self, height: usize) -> Option<*const Node<K>> {
+    pub fn next(&self, height: usize) -> Option<&Node<K>> {
         match self.forward_.get(height) {
             None => None,
             Some(ptr) =>
                 if ptr.is_null() {
                     None
                 } else {
-                    Some(*ptr)
+                    Some(unsafe { &** ptr })
                 }
         }
     }
 
     #[inline(always)]
-    pub fn mut_next(&mut self, height: usize) -> Option<*mut Node<K>> {
+    pub fn mut_next(&mut self, height: usize) -> Option<&mut Node<K>> {
         match self.forward_.get(height) {
             None => None,
             Some(ptr) =>
                 if ptr.is_null() {
                     None
                 } else {
-                    Some(*ptr)
+                    Some(unsafe { &mut **ptr })
                 }
         }
     }
 
     #[inline(always)]
     pub fn link_to(&mut self, height: usize, destination: *mut Node<K>) {
-        debug_assert!(height < self.forward_.len());
+        debug_assert!(height <= self.height());
         self.forward_[height] = destination;
     }
 
     pub fn link_to_next(&mut self, height: usize, node: &Node<K>) {
+        debug_assert!(height <= self.height());
+        debug_assert!(height <= node.height());
         self.forward_[height] = node.forward_[height];
     }
 
     #[inline(always)]
     pub fn key(&self) -> &K {
         &self.key_
-    }
-
-    #[inline(always)]
-    pub fn replace_key(&mut self, key: K) -> K {
-        std::mem::replace(&mut self.key_, key)
     }
 }
 
@@ -106,7 +102,7 @@ mod tests {
 
             if h == k_node_set_height {
                 let next_ptr = next.unwrap();
-                assert_eq!(next_ptr, next_node);
+                assert_eq!(next_ptr.key(), unsafe { (*next_node).key() });
             } else {
                 assert!(next.is_none());
             }
@@ -115,16 +111,5 @@ mod tests {
         unsafe {
             Box::from_raw(next_node);
         }
-    }
-
-    #[test]
-    fn replace_key() {
-        let k_node_key = 3;
-        let k_node_replacement_key = 8;
-        let k_node_height = 5;
-        let mut node = Node::new(k_node_key, k_node_height);
-
-        assert_eq!(node.replace_key(k_node_replacement_key), k_node_key);
-        assert_eq!(*node.key(), k_node_replacement_key);
     }
 }
