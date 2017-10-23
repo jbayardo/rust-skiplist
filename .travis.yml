@@ -2,15 +2,15 @@ language: rust
 sudo: false
 rust:
   - nightly
-  - beta
+#  - beta
 env:
   global:
     - RUST_BACKTRACE=1
 
 # TODO: add envs from https://github.com/japaric/trust/blob/master/.travis.yml
-matrix:
-  allow_failures:
-    - rust: beta
+#matrix:
+#  allow_failures:
+#    - rust: beta
 
   include:
     # These are the targets we support
