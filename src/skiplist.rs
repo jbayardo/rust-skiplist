@@ -3,8 +3,6 @@ use height_control::HeightControl;
 
 use std;
 
-extern crate rand;
-
 pub struct SkipList<K> {
     /// Pointer to the head of the Skip List. The first node is actually a "ghost"
     /// node: it is created within `SkipList::new`, should only be deleted in
@@ -292,6 +290,8 @@ impl<K: Ord> std::ops::Index<K> for SkipList<K> {
 // TODO: prefetch, benchmarks
 #[cfg(test)]
 mod tests {
+    extern crate rand;
+
     use super::*;
 
     #[test]
@@ -469,10 +469,10 @@ mod tests {
     #[test]
     fn random_insert_remove() {
         use self::rand::Rng;
+        let mut rng = self::rand::thread_rng();
 
         let mut list: SkipList<u32> = Default::default();
         let mut inserted = std::collections::BTreeSet::new();
-        let mut rng = self::rand::thread_rng();
 
         let mut elements = 0;
         for _i in 0..1000 {
