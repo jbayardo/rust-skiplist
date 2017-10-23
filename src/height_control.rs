@@ -4,7 +4,6 @@ use std;
 use std::default::Default;
 
 extern crate rand;
-use self::rand::{random, Open01};
 
 /// This trait is for structures that implement a height generation strategy for
 /// `SkipList<K>`.
@@ -98,7 +97,6 @@ impl GeometricalGenerator {
 }
 
 impl<K> HeightControl<K> for GeometricalGenerator {
-    #[inline(always)]
     fn max_height(&self) -> usize {
         self.max_height_
     }
@@ -110,7 +108,7 @@ impl<K> HeightControl<K> for GeometricalGenerator {
         let mut h = 0;
 
         while h < self.max_height_ {
-            let Open01(throw) = random::<Open01<f64>>();
+            let rand::Open01(throw) = rand::random::<rand::Open01<f64>>();
             if throw >= self.upgrade_probability_ {
                 return h;
             }
@@ -164,7 +162,6 @@ impl<K: std::hash::Hash, H: std::hash::Hasher> HashCoinGenerator<K, H> {
 }
 
 impl<K: std::hash::Hash, H: std::hash::Hasher> HeightControl<K> for HashCoinGenerator<K, H> {
-    #[inline(always)]
     fn max_height(&self) -> usize {
         self.max_height_
     }
@@ -177,8 +174,7 @@ impl<K: std::hash::Hash, H: std::hash::Hasher> HeightControl<K> for HashCoinGene
         let height = self.hasher_.finish().trailing_zeros() as usize;
         // TODO: this is biased to low end values, unless max_height_ is a power
         // of two.
-        let output = height % self.max_height_;
-        output
+        height % self.max_height_
     }
 }
 
@@ -206,7 +202,6 @@ impl<K> TwoPowGenerator<K> {
 }
 
 impl<K> HeightControl<K> for TwoPowGenerator<K> {
-    #[inline(always)]
     fn max_height(&self) -> usize {
         self.max_pow_ + 1
     }
@@ -215,7 +210,7 @@ impl<K> HeightControl<K> for TwoPowGenerator<K> {
     fn get_height(&mut self, key: &K) -> usize {
         // The probability that a random value has a binary representation that
         // ends with 1 0^k is (1/2)^{k+1}.
-        let height = random::<usize>().trailing_zeros() as usize;
+        let height = rand::random::<usize>().trailing_zeros() as usize;
         // Since we are always doing `% 2^k` here, we are using the simple trick
         // exposed here: https://stackoverflow.com/q/6670715 .
         height & self.max_pow_
@@ -223,7 +218,6 @@ impl<K> HeightControl<K> for TwoPowGenerator<K> {
 }
 
 impl<K: 'static + std::hash::Hash + Default> Default for SkipList<K> {
-    #[inline(always)]
     fn default() -> Self {
         Self::new(Box::new(TwoPowGenerator::new(16)))
     }

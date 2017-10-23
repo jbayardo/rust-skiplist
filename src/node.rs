@@ -10,7 +10,6 @@ impl<K> Node<K> {
     // Node of height 0 means it has only one pointer to the next node, node of
     // height 1 means it keeps a pointer to the next node, and to the next
     // height 1 node, and so on and so forth.
-    #[inline(always)]
     pub fn new(key: K, height: usize) -> Node<K> {
         Node {
             forward_: vec![std::ptr::null_mut(); height + 1],
@@ -18,39 +17,37 @@ impl<K> Node<K> {
         }
     }
 
-    #[inline(always)]
     pub fn height(&self) -> usize {
         self.forward_.len() - 1
     }
 
     // Returns a reference to the underlying node at the given height
-    #[inline(always)]
     pub fn next(&self, height: usize) -> Option<&Node<K>> {
         match self.forward_.get(height) {
             None => None,
-            Some(ptr) =>
+            Some(ptr) => {
                 if ptr.is_null() {
                     None
                 } else {
-                    Some(unsafe { &** ptr })
+                    Some(unsafe { &**ptr })
                 }
+            }
         }
     }
 
-    #[inline(always)]
     pub fn mut_next(&mut self, height: usize) -> Option<&mut Node<K>> {
         match self.forward_.get(height) {
             None => None,
-            Some(ptr) =>
+            Some(ptr) => {
                 if ptr.is_null() {
                     None
                 } else {
                     Some(unsafe { &mut **ptr })
                 }
+            }
         }
     }
 
-    #[inline(always)]
     pub fn link_to(&mut self, height: usize, destination: *mut Node<K>) {
         debug_assert!(height <= self.height());
         self.forward_[height] = destination;
@@ -62,7 +59,6 @@ impl<K> Node<K> {
         self.forward_[height] = node.forward_[height];
     }
 
-    #[inline(always)]
     pub fn key(&self) -> &K {
         &self.key_
     }
@@ -89,7 +85,7 @@ mod tests {
 
     #[test]
     fn set_next() {
-        let k_node_key = 3;
+        let k_node_key = 4;
         let k_node_height = 5;
         let k_node_set_height = 0;
 

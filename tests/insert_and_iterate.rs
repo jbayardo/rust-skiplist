@@ -1,5 +1,5 @@
-extern crate skiplist;
-use skiplist::*;
+//extern crate skiplist;
+//use skiplist::*;
 
 //#[test]
 //fn insert_and_iterate() {
