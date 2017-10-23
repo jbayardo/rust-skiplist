@@ -26,7 +26,7 @@ impl<K> Node<K> {
         match self.forward_.get(height) {
             None => None,
             Some(ptr) => {
-                if ptr.is_null() {
+                if unlikely!(ptr.is_null()) {
                     None
                 } else {
                     Some(unsafe { &**ptr })
@@ -39,7 +39,7 @@ impl<K> Node<K> {
         match self.forward_.get(height) {
             None => None,
             Some(ptr) => {
-                if ptr.is_null() {
+                if unlikely!(ptr.is_null()) {
                     None
                 } else {
                     Some(unsafe { &mut **ptr })
@@ -50,13 +50,17 @@ impl<K> Node<K> {
 
     pub fn link_to(&mut self, height: usize, destination: *mut Node<K>) {
         debug_assert!(height <= self.height());
-        self.forward_[height] = destination;
+        unsafe {
+            *(self.forward_.get_unchecked_mut(height)) = destination;
+        }
     }
 
     pub fn link_to_next(&mut self, height: usize, node: &Node<K>) {
         debug_assert!(height <= self.height());
         debug_assert!(height <= node.height());
-        self.forward_[height] = node.forward_[height];
+        unsafe {
+            *(self.forward_.get_unchecked_mut(height)) = *(node.forward_.get_unchecked(height));
+        }
     }
 
     pub fn key(&self) -> &K {

@@ -32,6 +32,7 @@ pub struct SkipList<K> {
 }
 
 impl<K> SkipList<K> {
+    // TODO: custom allocators??
     fn allocate_node(key: K, height: usize) -> *mut Node<K> {
         // Generate the node. All memory allocation is done using Box so
         // that we can actually free it using Box later
@@ -52,6 +53,8 @@ impl<K> SkipList<K> {
         )
     }
 
+    /// Releases the memory held by the data structure. Does not initialize it again, so the state
+    /// after usage is invalid. See `clear` function for reference on how to restore.
     fn dispose(&mut self) {
         unsafe {
             let mut current = self.head_;
@@ -84,6 +87,8 @@ impl<K> SkipList<K> {
         }
     }
 
+    // TODO: non-memory-releasing clear, for clearing the structure with later release (i.e. drop)
+    /// Removes all elements.
     pub fn clear(&mut self) {
         self.dispose();
         self.head_ = Self::allocate_dummy_node(self.max_height());
@@ -91,12 +96,12 @@ impl<K> SkipList<K> {
         self.height_ = 0;
     }
 
-    /// Returns the number of values stored in the structure.
+    /// Returns the number of elements stored in the structure.
     pub fn len(&self) -> usize {
         self.length_
     }
 
-    /// Returns `true` if there are no values stored within the structure.
+    /// Returns `true` if there are no elements stored within the structure.
     pub fn is_empty(&self) -> bool {
         self.length_ == 0
     }
@@ -115,10 +120,18 @@ impl<K> Drop for SkipList<K> {
 
 impl<K: std::fmt::Display> std::fmt::Display for SkipList<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "[ ").unwrap();
+        let mut printed = self.len();
+
+        write!(f, "[").unwrap();
 
         for key in self.iter() {
-            write!(f, "{} ", key).unwrap();
+            printed -= 1;
+
+            if likely!(printed >= 1) {
+                write!(f, "{}, ", key).unwrap();
+            } else {
+                write!(f, "{}", key).unwrap();
+            }
         }
 
         write!(f, "]").unwrap();
@@ -133,7 +146,7 @@ impl<K: Ord> SkipList<K> {
 
         for height in (0..std::cmp::max(self.height_, 1)).rev() {
             while let Some(next) = unsafe { (*current_ptr).next(height) } {
-                if next.key() < key {
+                if likely!(next.key() < key) {
                     current_ptr = next;
                 } else {
                     break;
@@ -165,7 +178,7 @@ impl<K: Ord> SkipList<K> {
             let mut current_ptr = self.head_;
             for height in (0..std::cmp::max(self.height_, 1)).rev() {
                 while let Some(next) = (*current_ptr).mut_next(height) {
-                    if next.key() < key {
+                    if likely!(next.key() < key) {
                         current_ptr = next;
                     } else {
                         break;
@@ -179,6 +192,7 @@ impl<K: Ord> SkipList<K> {
         }
     }
 
+    // Insert `key`. Returns false if `key` was already found.
     pub fn insert(&mut self, key: K) -> bool {
         // TODO: initialize this later. This may not ever get used if the key
         // already exists
@@ -190,7 +204,7 @@ impl<K: Ord> SkipList<K> {
             match lower_bound.next(0) {
                 // The lower bound's next node, if present, could be the same as the
                 // key we are looking for, so we could abort early here
-                Some(next) if next.key() == &key => return false,
+                Some(next) if unlikely!(next.key() == &key) => return false,
                 _ => {}
             }
 
@@ -212,19 +226,23 @@ impl<K: Ord> SkipList<K> {
         true
     }
 
+    /// Returns the element with key `key`, if it exists.
     pub fn get(&self, key: &K) -> Option<&K> {
         let lower_bound: &Node<K> = self.find_lower_bound(key);
 
         match lower_bound.next(0) {
-            Some(node) if node.key() == key => Some(node.key()),
+            Some(node) if likely!(node.key() == key) => Some(node.key()),
             _ => None,
         }
     }
 
+    /// Returns true if `key` is in the list.
     pub fn contains(&self, key: &K) -> bool {
         self.get(key).is_some()
     }
 
+    /// Removes `key` from the list. Returns true if it was successfully
+    /// removed; false if it was not found.
     pub fn remove(&mut self, key: &K) -> bool {
         {
             let (lower_bound, mut updates) = self.find_lower_bound_with_updates(key);
@@ -238,7 +256,7 @@ impl<K: Ord> SkipList<K> {
                 Some(removal) => {
                     // If the key is not the one that we are looking for, then that
                     // means we are done
-                    if removal.key() != key {
+                    if unlikely!(removal.key() != key) {
                         return false;
                     }
 
@@ -255,7 +273,6 @@ impl<K: Ord> SkipList<K> {
             }
         }
 
-        // Update length
         self.length_ -= 1;
         true
     }
@@ -269,6 +286,10 @@ impl<K: Ord> std::ops::Index<K> for SkipList<K> {
     }
 }
 
+// TODO: Deref which returns an iter.
+// TODO: range queries
+
+// TODO: prefetch, benchmarks
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -293,29 +314,39 @@ mod tests {
         let key = 34;
         let mut list: SkipList<i32> = Default::default();
         assert!(list.insert(key));
+        assert_eq!(list.len(), 1);
         list.clear();
+        assert_eq!(list.len(), 0);
         assert!(!list.contains(&key));
     }
 
     #[test]
     fn clear_multiple() {
-        let mut list: SkipList<i32> = Default::default();
+        let mut list: SkipList<usize> = Default::default();
 
         for i in 0..10 {
+            assert_eq!(list.len(), i);
             assert!(list.insert(i));
+            assert!(!list.insert(i));
         }
 
+        assert_eq!(list.len(), 10);
         list.clear();
+        assert_eq!(list.len(), 0);
 
         for i in 0..10 {
+            assert_eq!(list.len(), i);
             assert!(!list.contains(&i));
             assert!(list.insert(i));
         }
 
+        assert_eq!(list.len(), 10);
         list.clear();
+        assert_eq!(list.len(), 0);
 
         for i in 0..10 {
             assert!(!list.remove(&i));
+            assert_eq!(list.len(), 0);
         }
     }
 
@@ -324,9 +355,7 @@ mod tests {
         let key = 34;
         let mut list: SkipList<i32> = Default::default();
         assert!(list.insert(key));
-
         assert_eq!(list.len(), 1);
-        assert!(!list.is_empty());
 
         {
             let fetched = list.get(&key);
@@ -414,8 +443,11 @@ mod tests {
         let mut list: SkipList<i32> = Default::default();
         assert!(list.is_empty());
         assert!(!list.remove(&3));
+        assert_eq!(list.len(), 0);
         assert!(!list.remove(&32));
+        assert_eq!(list.len(), 0);
         assert!(!list.remove(&22));
+        assert_eq!(list.len(), 0);
     }
 
     #[test]
@@ -442,21 +474,111 @@ mod tests {
         let mut inserted = std::collections::BTreeSet::new();
         let mut rng = self::rand::thread_rng();
 
+        let mut elements = 0;
         for _i in 0..1000 {
             let element = rng.next_u32();
+            assert_eq!(list.len(), elements);
+
             assert!(list.insert(element));
             assert!(list.contains(&element));
+
             inserted.insert(element);
+            elements += 1;
         }
 
         for element in &inserted {
+            assert_eq!(list.len(), elements);
+
             assert!(list.contains(element));
             assert!(!list.insert(*element));
 
             if rng.next_u32() % 2 == 0 {
                 assert!(list.remove(element));
                 assert!(!list.contains(element));
+                elements -= 1;
             }
         }
     }
+
+    #[test]
+    fn format_empty() {
+        let list: SkipList<u32> = Default::default();
+        assert_eq!(format!("{}", list), "[]");
+    }
+
+    #[test]
+    fn format_singleton() {
+        let mut list: SkipList<u32> = Default::default();
+        list.insert(1);
+        assert_eq!(format!("{}", list), "[1]");
+    }
+
+    #[test]
+    fn format_two() {
+        let mut list: SkipList<u32> = Default::default();
+        list.insert(1);
+        list.insert(2);
+        assert_eq!(format!("{}", list), "[1, 2]");
+    }
+
+    #[test]
+    fn format_multiple() {
+        let mut list: SkipList<u32> = Default::default();
+        list.insert(1);
+        list.insert(2);
+        list.insert(3);
+        list.insert(4);
+        list.insert(5);
+        list.insert(6);
+        assert_eq!(format!("{}", list), "[1, 2, 3, 4, 5, 6]")
+    }
+
+    #[test]
+    #[should_panic]
+    fn index_empty() {
+        let list: SkipList<u32> = Default::default();
+        list[23];
+    }
+
+    #[test]
+    fn index_singleton() {
+        let mut list: SkipList<u32> = Default::default();
+        list.insert(32);
+        assert_eq!(list[32], 32);
+    }
+
+    #[test]
+    #[should_panic]
+    fn index_singleton_nonexistant() {
+        let mut list: SkipList<u32> = Default::default();
+        list.insert(32);
+        list[23];
+    }
+
+    #[test]
+    fn index_multiple() {
+        let mut list: SkipList<u32> = Default::default();
+        list.insert(3);
+        list.insert(2);
+        list.insert(6);
+        list.insert(1);
+        list.insert(5);
+        list.insert(4);
+        assert_eq!(list[6], 6);
+    }
+
+    #[test]
+    #[should_panic]
+    fn index_multiple_nonexistant() {
+        let mut list: SkipList<u32> = Default::default();
+        list.insert(3);
+        list.insert(2);
+        list.insert(6);
+        list.insert(1);
+        list.insert(5);
+        list.insert(4);
+        list[23];
+    }
+
+    // TODO: memory leak tests
 }

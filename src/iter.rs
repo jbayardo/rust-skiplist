@@ -22,8 +22,41 @@ impl<'a, K: 'a> Iterator for Iter<'a, K> {
     type Item = &'a K;
 
     fn next(&mut self) -> Option<Self::Item> {
+        // TODO: prefetch, likely
         let key = self.current_.map(|node| node.key());
         self.current_ = self.current_.and_then(|node| node.next(0));
         key
+    }
+}
+
+// TODO: size hint
+// TODO: first, last, binary_search
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new() {
+    }
+
+    #[test]
+    fn iter_empty() {
+    }
+
+    #[test]
+    fn iter_single() {
+    }
+
+    #[test]
+    fn iter_two() {
+    }
+
+    #[test]
+    fn iter_multiple() {
+    }
+
+    #[test]
+    fn iter_and_insert_simultaneously() {
     }
 }

@@ -171,6 +171,7 @@ impl<K: std::hash::Hash, H: std::hash::Hasher> HeightControl<K> for HashCoinGene
         // output universe. This means that the probability of getting a
         // sequence of trailing zeros of zero-based length i is (1/2)^(i + 1)
         key.hash(&mut self.hasher_);
+        // TODO: std::intrinsics::ctlz
         let height = self.hasher_.finish().trailing_zeros() as usize;
         // TODO: this is biased to low end values, unless max_height_ is a power
         // of two.
@@ -208,6 +209,7 @@ impl<K> HeightControl<K> for TwoPowGenerator<K> {
 
     #[allow(unused_variables)]
     fn get_height(&mut self, key: &K) -> usize {
+        // TODO: std::intrinsics::ctlz
         // The probability that a random value has a binary representation that
         // ends with 1 0^k is (1/2)^{k+1}.
         let height = rand::random::<usize>().trailing_zeros() as usize;
@@ -221,4 +223,10 @@ impl<K: 'static + std::hash::Hash + Default> Default for SkipList<K> {
     fn default() -> Self {
         Self::new(Box::new(TwoPowGenerator::new(16)))
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // TODO: tests
 }
