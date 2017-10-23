@@ -1,9 +1,25 @@
-# rust-skiplist
-Implementation of Skip List for Rust
+Skip List implementation for Rust. Currently **under very active development**; please do NOT use (this is not in crates.io for a reason!).
 
-[![Average time to resolve an issue](http://isitmaintained.com/badge/resolution/jbayardo/rust-skiplist.svg)](http://isitmaintained.com/project/jbayardo/rust-skiplist "Average time to resolve an issue")
-
-[![Percentage of issues still open](http://isitmaintained.com/badge/open/jbayardo/rust-skiplist.svg)](http://isitmaintained.com/project/jbayardo/rust-skiplist "Percentage of issues still open")
+# Code Status [![Build Status](https://travis-ci.org/jbayardo/rust-skiplist.svg?branch=master)](https://travis-ci.org/jbayardo/rust-skiplist) [![Windows Build Status](https://ci.appveyor.com/api/projects/status/5wd0sbesdncwp80d?svg=true)](https://ci.appveyor.com/project/jbayardo/rust-skiplist) 
 
 [![Test coverage](https://codecov.io/gh/jbayardo/rust-skiplist/branch/master/graph/badge.svg)](https://codecov.io/gh/jbayardo/rust-skiplist)
 
+[![Percentage of issues still open](http://isitmaintained.com/badge/open/jbayardo/rust-skiplist.svg)](http://isitmaintained.com/project/jbayardo/rust-skiplist "Percentage of issues still open") [![Average time to resolve an issue](http://isitmaintained.com/badge/resolution/jbayardo/rust-skiplist.svg)](http://isitmaintained.com/project/jbayardo/rust-skiplist "Average time to resolve an issue") 
+
+# Releases
+
+Library releases follow [semantic versioning](http://semver.org/). Versioned releases can be found in Github's [release manager](https://github.com/jbayardo/rust-skiplist/releases). 
+
+# Reporting issues
+
+Please report all issues on the Github [issue tracker](https://github.com/jbayardo/rust-skiplist/issues). [Due dilligence](https://contribution-guide-org.readthedocs.io/#due-diligence) is expected, and please include [all relevant information](https://contribution-guide-org.readthedocs.io/#what-to-put-in-your-bug-report).
+
+# Contributing
+
+All code contributed must pass through [Clippy](https://github.com/rust-lang-nursery/rust-clippy) and [Format](https://github.com/rust-lang-nursery/rustfmt), and no code will be merged unless it is thoroughly tested. Please look at the [Rust Book](https://doc.rust-lang.org/book/second-edition/ch11-03-test-organization.html) if you are not sure how to do this.
+
+Changes for performance improvement must include benchmark results to back the claim. New dependencies are to be avoided; this library is expected to be as dependency-free as possible. 
+
+# License
+
+See [LICENSE.md](https://github.com/jbayardo/rust-skiplist/blob/master/LICENSE).

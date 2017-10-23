@@ -16,10 +16,7 @@ extern crate rand;
 /// space or speed concerns and they are certain that a change in the strategy
 /// will fix their problem.
 pub trait HeightControl<K> {
-    /// Returns the maximum height that this controller can generate. This value
-    /// must be constant per instance: implementors of this trait should not
-    /// allow the output of this function to ever change after an instance has
-    /// been created.
+    /// Returns the maximum height that this controller can generate.
     ///
     /// # Remarks
     ///
@@ -28,8 +25,11 @@ pub trait HeightControl<K> {
     /// the skip list needs to allocate a vector of the size given by this
     /// function. Searches happen in every action on it except for iteration.
     ///
-    /// It is also called very frequently, which means that it should ideally be
-    /// both inlineable and O(1).
+    /// The value is required very frequently, so it is effect assumed not to
+    /// change after the skip list has been initialized. This allows us to
+    /// avoid one virtual call on pretty much every single library call. It is
+    /// also a sane assumption: reasonable maximum height values hold an
+    /// amount of nodes directly proportional to the promotion probability.
     fn max_height(&self) -> usize;
 
     /// Generates a height for the `key`.
@@ -60,15 +60,13 @@ pub trait HeightControl<K> {
 }
 
 /// Implements height generation through simulation of a capped geometrical
-/// random variable.
+/// random variable. It is included here for completeness, `PowTwoGenerator`
+/// should always be preferred.
 ///
 /// This implements the algorithm in the original paper:
 /// * William Pugh. 1990. "Skip lists: a probabilistic alternative to balanced
 ///   trees". Commun. ACM 33, 6 (June 1990), 668-676.
 ///   DOI=http://dx.doi.org/10.1145/78973.78977
-///
-/// And is only included here for completeness, `PowTwoGenerator` should always
-/// be preferred.
 pub struct GeometricalGenerator {
     upgrade_probability_: f64,
     max_height_: usize,

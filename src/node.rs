@@ -75,20 +75,35 @@ mod tests {
 
     #[test]
     fn new() {
-        let k_node_key = 3;
-        let k_node_height = 5;
-        let node = Node::new(k_node_key, k_node_height);
+        let key = 3;
+        let height = 5;
+        let node = Node::new(key, height);
+        assert_eq!(*node.key(), key);
+        assert_eq!(node.height(), height);
+    }
 
-        assert_eq!(*node.key(), k_node_key);
-        assert_eq!(node.height(), k_node_height);
+    #[test]
+    fn next_out_of_bounds() {
+        let key = 3;
+        let height = 5;
+        let mut node = Node::new(key, height);
+        assert!(node.next(10).is_none());
+        assert!(node.mut_next(10).is_none());
+    }
 
-        for height in 0..k_node_height {
+    #[test]
+    fn next_empty() {
+        let key = 3;
+        let height = 5;
+        let mut node = Node::new(key, height);
+        for height in 0..height {
             assert!(node.next(height).is_none());
+            assert!(node.mut_next(height).is_none());
         }
     }
 
     #[test]
-    fn set_next() {
+    fn link_singleton() {
         let k_node_key = 4;
         let k_node_height = 5;
         let k_node_set_height = 0;
@@ -105,11 +120,26 @@ mod tests {
                 assert_eq!(next_ptr.key(), unsafe { (*next_node).key() });
             } else {
                 assert!(next.is_none());
-            }
+        }
         }
 
         unsafe {
             Box::from_raw(next_node);
         }
+    }
+
+    #[test]
+    fn link_out_of_range() {
+
+    }
+
+    #[test]
+    fn link_next_singleton() {
+
+    }
+
+    #[test]
+    fn link_next_out_of_range() {
+
     }
 }
