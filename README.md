@@ -8,7 +8,9 @@ Skip List implementation for Rust. Currently **under very active development**; 
 
 # Releases
 
-Library releases follow [semantic versioning](http://semver.org/). Versioned releases can be found in Github's [release manager](https://github.com/jbayardo/rust-skiplist/releases). 
+Library releases follow [semantic versioning](http://semver.org/). Versioned releases can be found in Github's [release manager](https://github.com/jbayardo/rust-skiplist/releases).
+
+Notice that this project **requires** Rust nightly to work. This is due to unavailable primitives in stable and beta channels; work is underway to make it compatible with beta and stable channels, but may take a while. 
 
 # Reporting issues
 
