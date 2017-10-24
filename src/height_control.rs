@@ -5,6 +5,33 @@ use std::default::Default;
 
 extern crate rand;
 
+/// This comes from the slightly delicate usage that we have for `HeightControl<K>`: `SkipList<K>`
+/// needs to hold a trait object that satisfies `HeightControl<K>`; however, there is no way to
+/// impose a reasonable Clone constraint in that case, so there's two options: either we derive from
+/// Clone in HeightControl<K>, or we do the trick below.
+///
+/// The first option was discarded because it is very unclear; the second is used below. Users do
+/// not need to effectively do anything about it, they just implement Clone for their structs that
+/// implement HeightControl<K>.
+pub trait HeightControlClone<K> {
+    fn clone_box(&self) -> Box<HeightControl<K>>;
+}
+
+impl<K, T> HeightControlClone<K> for T
+where
+    T: 'static + HeightControl<K> + Clone,
+{
+    fn clone_box(&self) -> Box<HeightControl<K>> {
+        Box::new(self.clone())
+    }
+}
+
+impl<K> Clone for Box<HeightControl<K>> {
+    fn clone(&self) -> Box<HeightControl<K>> {
+        self.clone_box()
+    }
+}
+
 /// This trait is for structures that implement a height generation strategy for
 /// `SkipList<K>`.
 ///
@@ -15,7 +42,7 @@ extern crate rand;
 /// Users should avoid implementing this trait unless there are effectively
 /// space or speed concerns and they are certain that a change in the strategy
 /// will fix their problem.
-pub trait HeightControl<K> {
+pub trait HeightControl<K>: HeightControlClone<K> {
     /// Returns the maximum height that this controller can generate.
     ///
     /// # Remarks
@@ -94,7 +121,7 @@ impl GeometricalGenerator {
     }
 }
 
-impl<K> HeightControl<K> for GeometricalGenerator {
+impl<K: 'static> HeightControl<K> for GeometricalGenerator {
     fn max_height(&self) -> usize {
         self.max_height_
     }
@@ -115,6 +142,12 @@ impl<K> HeightControl<K> for GeometricalGenerator {
         }
 
         h
+    }
+}
+
+impl Clone for GeometricalGenerator {
+    fn clone(&self) -> GeometricalGenerator {
+        GeometricalGenerator::new(self.max_height_, self.upgrade_probability_)
     }
 }
 
@@ -159,7 +192,8 @@ impl<K: std::hash::Hash, H: std::hash::Hasher> HashCoinGenerator<K, H> {
     }
 }
 
-impl<K: std::hash::Hash, H: std::hash::Hasher> HeightControl<K> for HashCoinGenerator<K, H> {
+impl<K: 'static + std::hash::Hash, H: 'static + std::hash::Hasher + Clone> HeightControl<K>
+    for HashCoinGenerator<K, H> {
     fn max_height(&self) -> usize {
         self.max_height_
     }
@@ -174,6 +208,12 @@ impl<K: std::hash::Hash, H: std::hash::Hasher> HeightControl<K> for HashCoinGene
         // TODO: this is biased to low end values, unless max_height_ is a power
         // of two.
         height % self.max_height_
+    }
+}
+
+impl<K: std::hash::Hash, H: std::hash::Hasher + Clone> Clone for HashCoinGenerator<K, H> {
+    fn clone(&self) -> HashCoinGenerator<K, H> {
+        HashCoinGenerator::new(self.max_height_, self.hasher_.clone())
     }
 }
 
@@ -200,7 +240,7 @@ impl<K> TwoPowGenerator<K> {
     }
 }
 
-impl<K> HeightControl<K> for TwoPowGenerator<K> {
+impl<K: 'static> HeightControl<K> for TwoPowGenerator<K> {
     fn max_height(&self) -> usize {
         self.max_pow_ + 1
     }
@@ -217,14 +257,14 @@ impl<K> HeightControl<K> for TwoPowGenerator<K> {
     }
 }
 
-impl<K: 'static + std::hash::Hash + Default> Default for SkipList<K> {
-    fn default() -> Self {
-        Self::new(Box::new(TwoPowGenerator::new(16)))
+impl<K> Clone for TwoPowGenerator<K> {
+    fn clone(&self) -> TwoPowGenerator<K> {
+        TwoPowGenerator::new(self.max_pow_ + 1)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    // TODO: tests
+impl<K: 'static + std::hash::Hash> Default for SkipList<K> {
+    fn default() -> Self {
+        Self::new(Box::new(TwoPowGenerator::new(16)))
+    }
 }

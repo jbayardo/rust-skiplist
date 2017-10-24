@@ -85,7 +85,9 @@ impl<K> SkipList<K> {
         }
     }
 
-    // TODO: non-memory-releasing clear, for clearing the structure with later release (i.e. drop)
+    // TODO: non-memory-releasing clear, for clearing the structure with later release (i.e. drop),
+    // should be guaranteed O(1)
+
     /// Removes all elements.
     pub fn clear(&mut self) {
         self.dispose();
@@ -129,6 +131,27 @@ impl<K: std::fmt::Display> std::fmt::Display for SkipList<K> {
                 write!(f, "{}, ", key).unwrap();
             } else {
                 write!(f, "{}", key).unwrap();
+            }
+        }
+
+        write!(f, "]").unwrap();
+        std::result::Result::Ok(())
+    }
+}
+
+impl<K: std::fmt::Debug> std::fmt::Debug for SkipList<K> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut printed = self.len();
+
+        write!(f, "[").unwrap();
+
+        for key in self.iter() {
+            printed -= 1;
+
+            if likely!(printed >= 1) {
+                write!(f, "{:?}, ", key).unwrap();
+            } else {
+                write!(f, "{:?}", key).unwrap();
             }
         }
 
@@ -293,6 +316,40 @@ mod tests {
     extern crate rand;
 
     use super::*;
+    use quickcheck::{Arbitrary, quickcheck, TestResult, Gen};
+    use height_control::GeometricalGenerator;
+
+    // TODO: when moving into multithreaded support, ensure we protect accordingly.
+    unsafe impl<K> Send for SkipList<K> {}
+
+    /// This is only implemented in the test environment because we want to
+    /// avoid accidentally deep copying a node.
+    impl<K: Ord + Clone> Clone for SkipList<K> {
+        fn clone(&self) -> Self {
+            let mut list: SkipList<K> = SkipList::new(self.controller_.clone());
+            for element in self.iter() {
+                list.insert(element.clone());
+            }
+            list
+        }
+    }
+
+    impl<K: Ord + Arbitrary> Arbitrary for SkipList<K> {
+        fn arbitrary<G: Gen>(gen: &mut G) -> SkipList<K> {
+            let upgrade_probability = gen.gen_range(0.0, 1.0);
+            let max_height = gen.gen_range(1, 30);
+
+            let controller = Box::new(GeometricalGenerator::new(max_height, upgrade_probability));
+            let mut list = SkipList::new(controller);
+
+            let length: usize = Arbitrary::arbitrary(gen);
+            for _i in 0..length {
+                list.insert(Arbitrary::arbitrary(gen));
+            }
+
+            list
+        }
+    }
 
     #[test]
     fn new() {
@@ -302,11 +359,13 @@ mod tests {
     }
 
     #[test]
-    fn clear_empty() {
-        let mut list: SkipList<i32> = Default::default();
-        list.clear();
-        assert!(list.is_empty());
-        assert_eq!(list.len(), 0);
+    fn clear_empties() {
+        fn prop(mut list: SkipList<i32>) -> TestResult {
+            list.clear();
+            TestResult::from_bool(list.len() == 0 && list.is_empty())
+        }
+
+        quickcheck(prop as fn(SkipList<i32>) -> TestResult);
     }
 
     #[test]
@@ -321,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn clear_multiple() {
+    fn clear_does_not_invalidate() {
         let mut list: SkipList<usize> = Default::default();
 
         for i in 0..10 {
@@ -438,6 +497,20 @@ mod tests {
         assert!(!list.contains(&key_2));
     }
 
+
+    #[test]
+    fn insert_adds_one_to_length() {
+        fn prop(mut list: SkipList<i32>) -> TestResult {
+            let length = list.len();
+            // This just needs to produce a value that is not in the list yet...
+            let sum: i32 = list.iter().map(|v| v.abs()).sum();
+            list.insert(sum + 1);
+            TestResult::from_bool(list.len() == length + 1)
+        }
+
+        quickcheck(prop as fn(SkipList<i32>) -> TestResult);
+    }
+
     #[test]
     fn remove_empty() {
         let mut list: SkipList<i32> = Default::default();
@@ -498,6 +571,22 @@ mod tests {
                 elements -= 1;
             }
         }
+    }
+
+    #[test]
+    fn remove_takes_one_from_length() {
+        fn prop(mut list: SkipList<i32>) -> TestResult {
+            let length = list.len();
+            if length == 0 {
+                return TestResult::discard();
+            }
+
+            let first = list.iter().next().unwrap().clone();
+            list.remove(&first);
+            TestResult::from_bool(list.len() == length - 1)
+        }
+
+        quickcheck(prop as fn(SkipList<i32>) -> TestResult);
     }
 
     #[test]

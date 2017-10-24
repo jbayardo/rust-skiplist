@@ -120,7 +120,7 @@ mod tests {
                 assert_eq!(next_ptr.key(), unsafe { (*next_node).key() });
             } else {
                 assert!(next.is_none());
-        }
+            }
         }
 
         unsafe {
@@ -129,17 +129,11 @@ mod tests {
     }
 
     #[test]
-    fn link_out_of_range() {
-
-    }
+    fn link_out_of_range() {}
 
     #[test]
-    fn link_next_singleton() {
-
-    }
+    fn link_next_singleton() {}
 
     #[test]
-    fn link_next_out_of_range() {
-
-    }
+    fn link_next_out_of_range() {}
 }

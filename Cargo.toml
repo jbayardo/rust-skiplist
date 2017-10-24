@@ -16,6 +16,7 @@ is-it-maintained-issue-resolution = { repository = "jbayardo/rust-skiplist" }
 is-it-maintained-open-issues = { repository = "jbayardo/rust-skiplist" }
 
 [dependencies]
-rand = "*"
-log = "*"
-env_logger = "*"
+rand = "0.3"
+
+[dev-dependencies]
+quickcheck = "0.3"

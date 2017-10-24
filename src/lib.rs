@@ -1,11 +1,16 @@
 #![crate_type = "lib"]
 #![crate_name = "skiplist"]
-#![feature(rand)]
 
 // used in macros
 #![feature(core_intrinsics)]
 #![feature(allow_internal_unsafe)]
 #![feature(stmt_expr_attributes)]
+
+
+// test framework
+#![cfg_attr(test, feature(plugin))]
+#[cfg(test)]
+extern crate quickcheck;
 
 #[macro_use]
 mod macros;
@@ -18,3 +23,4 @@ mod range;
 
 pub use skiplist::SkipList;
 pub use height_control::{HeightControl, HashCoinGenerator, GeometricalGenerator, TwoPowGenerator};
+pub use iter::Iter;
