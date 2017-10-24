@@ -1,19 +1,21 @@
 use std;
 
 #[derive(Debug)]
-pub(crate) struct Node<K> {
-    forward_: std::vec::Vec<*mut Node<K>>,
+pub(crate) struct Node<K, V> {
+    forward_: std::vec::Vec<*mut Node<K, V>>,
     key_: K,
+    value_: V
 }
 
-impl<K> Node<K> {
+impl<K, V> Node<K, V> {
     // Node of height 0 means it has only one pointer to the next node, node of
     // height 1 means it keeps a pointer to the next node, and to the next
     // height 1 node, and so on and so forth.
-    pub fn new(key: K, height: usize) -> Node<K> {
+    pub fn new(key: K, value: V, height: usize) -> Node<K, V> {
         Node {
             forward_: vec![std::ptr::null_mut(); height + 1],
             key_: key,
+            value_: value
         }
     }
 
@@ -22,7 +24,7 @@ impl<K> Node<K> {
     }
 
     // Returns a reference to the underlying node at the given height
-    pub fn next(&self, height: usize) -> Option<&Node<K>> {
+    pub fn next(&self, height: usize) -> Option<&Node<K, V>> {
         match self.forward_.get(height) {
             None => None,
             Some(ptr) => {
@@ -35,7 +37,7 @@ impl<K> Node<K> {
         }
     }
 
-    pub fn mut_next(&mut self, height: usize) -> Option<&mut Node<K>> {
+    pub fn mut_next(&mut self, height: usize) -> Option<&mut Node<K, V>> {
         match self.forward_.get(height) {
             None => None,
             Some(ptr) => {
@@ -48,14 +50,14 @@ impl<K> Node<K> {
         }
     }
 
-    pub fn link_to(&mut self, height: usize, destination: *mut Node<K>) {
+    pub fn link_to(&mut self, height: usize, destination: *mut Node<K, V>) {
         debug_assert!(height <= self.height());
         unsafe {
             *(self.forward_.get_unchecked_mut(height)) = destination;
         }
     }
 
-    pub fn link_to_next(&mut self, height: usize, node: &Node<K>) {
+    pub fn link_to_next(&mut self, height: usize, node: &Node<K, V>) {
         debug_assert!(height <= self.height());
         debug_assert!(height <= node.height());
         unsafe {
@@ -65,6 +67,10 @@ impl<K> Node<K> {
 
     pub fn key(&self) -> &K {
         &self.key_
+    }
+
+    pub fn value(&self) -> &V {
+        &self.value_
     }
 }
 
@@ -76,17 +82,20 @@ mod tests {
     #[test]
     fn new() {
         let key = 3;
+        let value = 12;
         let height = 5;
-        let node = Node::new(key, height);
+        let node = Node::new(key, value, height);
         assert_eq!(*node.key(), key);
+        assert_eq!(*node.value(), value);
         assert_eq!(node.height(), height);
     }
 
     #[test]
     fn next_out_of_bounds() {
         let key = 3;
+        let value = 12;
         let height = 5;
-        let mut node = Node::new(key, height);
+        let mut node = Node::new(key, value, height);
         assert!(node.next(10).is_none());
         assert!(node.mut_next(10).is_none());
     }
@@ -94,8 +103,9 @@ mod tests {
     #[test]
     fn next_empty() {
         let key = 3;
+        let value = 42;
         let height = 5;
-        let mut node = Node::new(key, height);
+        let mut node = Node::new(key, value, height);
         for height in 0..height {
             assert!(node.next(height).is_none());
             assert!(node.mut_next(height).is_none());
@@ -104,12 +114,14 @@ mod tests {
 
     #[test]
     fn link_singleton() {
-        let k_node_key = 4;
-        let k_node_height = 5;
+        let key = 4;
+        let value = 12312;
+        let height = 5;
+
         let k_node_set_height = 0;
 
-        let mut node = Node::new(k_node_key, k_node_height);
-        let next_node = Box::into_raw(Box::new(Node::new(k_node_key, k_node_height)));
+        let mut node = Node::new(key, value, height);
+        let next_node = Box::into_raw(Box::new(Node::new(key, value, height)));
         node.link_to(k_node_set_height, next_node);
 
         for h in 0..node.height() {
@@ -118,6 +130,7 @@ mod tests {
             if h == k_node_set_height {
                 let next_ptr = next.unwrap();
                 assert_eq!(next_ptr.key(), unsafe { (*next_node).key() });
+                assert_eq!(next_ptr.value(), unsafe { (*next_node).value() });
             } else {
                 assert!(next.is_none());
             }

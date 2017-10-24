@@ -263,7 +263,7 @@ impl<K> Clone for TwoPowGenerator<K> {
     }
 }
 
-impl<K: 'static + std::hash::Hash> Default for SkipList<K> {
+impl<K: 'static + std::hash::Hash, V> Default for SkipList<K, V> {
     fn default() -> Self {
         Self::new(Box::new(TwoPowGenerator::new(16)))
     }

@@ -3,7 +3,7 @@ use height_control::HeightControl;
 
 use std;
 
-pub struct SkipList<K> {
+pub struct SkipList<K, V> {
     /// Pointer to the head of the Skip List. The first node is actually a "ghost"
     /// node: it is created within `SkipList::new`, should only be deleted in
     /// `SkipList::drop`, has the maximum possible height, and it holds dummy data
@@ -12,7 +12,7 @@ pub struct SkipList<K> {
     /// The reason we have the ghost node is because it simplifies the algorithms
     /// considerably. Searches for nodes all begin in the ghost node, which has
     /// as `next(0)` the actual first element, if any.
-    pub(crate) head_: *mut Node<K>,
+    pub(crate) head_: *mut Node<K, V>,
 
     /// Number of elements in the SkipList
     length_: usize,
@@ -29,23 +29,24 @@ pub struct SkipList<K> {
     controller_: Box<HeightControl<K>>,
 }
 
-impl<K> SkipList<K> {
+impl<K, V> SkipList<K, V> {
     // TODO: custom allocators??
-    fn allocate_node(key: K, height: usize) -> *mut Node<K> {
+    fn allocate_node(key: K, value: V, height: usize) -> *mut Node<K, V> {
         // Generate the node. All memory allocation is done using Box so
         // that we can actually free it using Box later
-        Box::into_raw(Box::new(Node::new(key, height)))
+        Box::into_raw(Box::new(Node::new(key, value, height)))
     }
 
-    fn free_node(node: *mut Node<K>) {
+    fn free_node(node: *mut Node<K, V>) {
         unsafe {
             Box::from_raw(node);
         }
     }
 
-    fn allocate_dummy_node(max_height: usize) -> *mut Node<K> {
+    fn allocate_dummy_node(max_height: usize) -> *mut Node<K, V> {
         Self::allocate_node(
             // We need to produce a value of type K which will never be accessed
+            unsafe { std::mem::uninitialized() },
             unsafe { std::mem::uninitialized() },
             max_height,
         )
@@ -66,10 +67,11 @@ impl<K> SkipList<K> {
         }
     }
 
-    pub fn new(controller: Box<HeightControl<K>>) -> SkipList<K> {
+    pub fn new(controller: Box<HeightControl<K>>) -> SkipList<K, V> {
         // This assertion is here because using Zero Sized Types requires
         // special handling which hasn't been implemented yet.
         assert_ne!(std::mem::size_of::<K>(), 0);
+        assert_ne!(std::mem::size_of::<V>(), 0);
         let max_height = controller.max_height();
 
         SkipList {
@@ -112,25 +114,25 @@ impl<K> SkipList<K> {
     }
 }
 
-impl<K> Drop for SkipList<K> {
+impl<K, V> Drop for SkipList<K, V> {
     fn drop(&mut self) {
         self.dispose();
     }
 }
 
-impl<K: std::fmt::Display> std::fmt::Display for SkipList<K> {
+impl<K: std::fmt::Display, V: std::fmt::Display> std::fmt::Display for SkipList<K, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut printed = self.len();
 
         write!(f, "[").unwrap();
 
-        for key in self.iter() {
+        for (key, value) in self.iter() {
             printed -= 1;
 
             if likely!(printed >= 1) {
-                write!(f, "{}, ", key).unwrap();
+                write!(f, "{}: {}, ", key, value).unwrap();
             } else {
-                write!(f, "{}", key).unwrap();
+                write!(f, "{}: {}", key, value).unwrap();
             }
         }
 
@@ -139,7 +141,7 @@ impl<K: std::fmt::Display> std::fmt::Display for SkipList<K> {
     }
 }
 
-impl<K: std::fmt::Debug> std::fmt::Debug for SkipList<K> {
+impl<K: std::fmt::Debug, V: std::fmt::Debug> std::fmt::Debug for SkipList<K, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut printed = self.len();
 
@@ -160,10 +162,10 @@ impl<K: std::fmt::Debug> std::fmt::Debug for SkipList<K> {
     }
 }
 
-impl<K: Ord> SkipList<K> {
+impl<K: Ord, V> SkipList<K, V> {
     /// Finds the node previous to the node that would have `key`, if any.
-    fn find_lower_bound(&self, key: &K) -> &Node<K> {
-        let mut current_ptr: *const Node<K> = self.head_;
+    fn find_lower_bound(&self, key: &K) -> &Node<K, V> {
+        let mut current_ptr: *const Node<K, V> = self.head_;
 
         for height in (0..std::cmp::max(self.height_, 1)).rev() {
             while let Some(next) = unsafe { (*current_ptr).next(height) } {
@@ -181,7 +183,7 @@ impl<K: Ord> SkipList<K> {
     /// Finds the node previous to the node that would have `key`, if any. It
     /// also generates an `updates` vector; the vector contains for index i, the
     /// last previous node that had height greater or equal than i.
-    fn find_lower_bound_with_updates(&mut self, key: &K) -> (&mut Node<K>, Vec<&mut Node<K>>) {
+    fn find_lower_bound_with_updates(&mut self, key: &K) -> (&mut Node<K, V>, Vec<&mut Node<K, V>>) {
         let max_height = self.max_height();
         let mut updates = Vec::with_capacity(max_height);
 
@@ -214,7 +216,7 @@ impl<K: Ord> SkipList<K> {
     }
 
     // Insert `key`. Returns false if `key` was already found.
-    pub fn insert(&mut self, key: K) -> bool {
+    pub fn insert(&mut self, key: K, value: V) -> bool {
         // TODO: initialize this later. This may not ever get used if the key
         // already exists
         let height = self.controller_.get_height(&key);
@@ -229,7 +231,7 @@ impl<K: Ord> SkipList<K> {
                 _ => {}
             }
 
-            let node = Self::allocate_node(key, height);
+            let node = Self::allocate_node(key, value, height);
             for (height, update) in updates.iter_mut().enumerate().take(
                 std::cmp::max(height, 1),
             )
@@ -248,17 +250,17 @@ impl<K: Ord> SkipList<K> {
     }
 
     /// Returns the element with key `key`, if it exists.
-    pub fn get(&self, key: &K) -> Option<&K> {
-        let lower_bound: &Node<K> = self.find_lower_bound(key);
+    pub fn get(&self, key: &K) -> Option<&V> {
+        let lower_bound: &Node<K, V> = self.find_lower_bound(key);
 
         match lower_bound.next(0) {
-            Some(node) if likely!(node.key() == key) => Some(node.key()),
+            Some(node) if likely!(node.key() == key) => Some(node.value()),
             _ => None,
         }
     }
 
     /// Returns true if `key` is in the list.
-    pub fn contains(&self, key: &K) -> bool {
+    pub fn contains_key(&self, key: &K) -> bool {
         self.get(key).is_some()
     }
 
@@ -297,15 +299,29 @@ impl<K: Ord> SkipList<K> {
         self.length_ -= 1;
         true
     }
+
+    pub fn replace(&mut self, key: K) -> Option<V> {
+        None
+    }
+
+    pub fn take(&mut self, key: &K) -> Option<V> {
+        None
+    }
+
+//    pub fn split_off(&mut self, key: &K) -> SkipList<K, V> {
+//        undefined!()
+//    }
 }
 
-impl<K: Ord> std::ops::Index<K> for SkipList<K> {
-    type Output = K;
+impl<K: Ord, V> std::ops::Index<K> for SkipList<K, V> {
+    type Output = V;
 
     fn index(&self, index: K) -> &Self::Output {
         self.get(&index).unwrap()
     }
 }
+
+
 
 // TODO: Deref which returns an iter.
 // TODO: range queries
@@ -320,22 +336,22 @@ mod tests {
     use height_control::GeometricalGenerator;
 
     // TODO: when moving into multithreaded support, ensure we protect accordingly.
-    unsafe impl<K> Send for SkipList<K> {}
+    unsafe impl<K, V> Send for SkipList<K, V> {}
 
     /// This is only implemented in the test environment because we want to
     /// avoid accidentally deep copying a node.
-    impl<K: Ord + Clone> Clone for SkipList<K> {
+    impl<K: Ord + Clone, V: Clone> Clone for SkipList<K, V> {
         fn clone(&self) -> Self {
-            let mut list: SkipList<K> = SkipList::new(self.controller_.clone());
+            let mut list: SkipList<K, V> = SkipList::new(self.controller_.clone());
             for element in self.iter() {
-                list.insert(element.clone());
+                list.insert(element.0.clone(), element.1.clone());
             }
             list
         }
     }
 
-    impl<K: Ord + Arbitrary> Arbitrary for SkipList<K> {
-        fn arbitrary<G: Gen>(gen: &mut G) -> SkipList<K> {
+    impl<K: Ord + Arbitrary, V: Arbitrary> Arbitrary for SkipList<K, V> {
+        fn arbitrary<G: Gen>(gen: &mut G) -> SkipList<K, V> {
             let upgrade_probability = gen.gen_range(0.0, 1.0);
             let max_height = gen.gen_range(1, 30);
 
@@ -344,7 +360,7 @@ mod tests {
 
             let length: usize = Arbitrary::arbitrary(gen);
             for _i in 0..length {
-                list.insert(Arbitrary::arbitrary(gen));
+                list.insert(Arbitrary::arbitrary(gen), Arbitrary::arbitrary(gen));
             }
 
             list
@@ -353,40 +369,41 @@ mod tests {
 
     #[test]
     fn new() {
-        let list: SkipList<i32> = Default::default();
+        let list: SkipList<i32, i32> = Default::default();
         assert_eq!(list.len(), 0);
         assert!(list.is_empty());
     }
 
     #[test]
     fn clear_empties() {
-        fn prop(mut list: SkipList<i32>) -> TestResult {
+        fn prop(mut list: SkipList<i32, i32>) -> TestResult {
             list.clear();
             TestResult::from_bool(list.len() == 0 && list.is_empty())
         }
 
-        quickcheck(prop as fn(SkipList<i32>) -> TestResult);
+        quickcheck(prop as fn(SkipList<i32, i32>) -> TestResult);
     }
 
     #[test]
     fn clear_single() {
         let key = 34;
-        let mut list: SkipList<i32> = Default::default();
-        assert!(list.insert(key));
+        let value = 9484;
+        let mut list: SkipList<i32, i32> = Default::default();
+        assert!(list.insert(key, value));
         assert_eq!(list.len(), 1);
         list.clear();
         assert_eq!(list.len(), 0);
-        assert!(!list.contains(&key));
+        assert!(!list.contains_key(&key));
     }
 
     #[test]
     fn clear_does_not_invalidate() {
-        let mut list: SkipList<usize> = Default::default();
+        let mut list: SkipList<usize, usize> = Default::default();
 
         for i in 0..10 {
             assert_eq!(list.len(), i);
-            assert!(list.insert(i));
-            assert!(!list.insert(i));
+            assert!(list.insert(i, i + 1));
+            assert!(!list.insert(i, i + 1));
         }
 
         assert_eq!(list.len(), 10);
@@ -395,8 +412,8 @@ mod tests {
 
         for i in 0..10 {
             assert_eq!(list.len(), i);
-            assert!(!list.contains(&i));
-            assert!(list.insert(i));
+            assert!(!list.contains_key(&i));
+            assert!(list.insert(i, i + 1));
         }
 
         assert_eq!(list.len(), 10);
@@ -412,14 +429,15 @@ mod tests {
     #[test]
     fn insert_get_single() {
         let key = 34;
-        let mut list: SkipList<i32> = Default::default();
-        assert!(list.insert(key));
+        let value = 433;
+        let mut list: SkipList<i32, i32> = Default::default();
+        assert!(list.insert(key, value));
         assert_eq!(list.len(), 1);
 
         {
             let fetched = list.get(&key);
             assert!(fetched.is_some());
-            assert_eq!(*fetched.unwrap(), key);
+            assert_eq!(*fetched.unwrap(), value);
 
             let second_fetched = list.get(&key);
             assert!(second_fetched.is_some());
@@ -435,18 +453,19 @@ mod tests {
     #[test]
     fn insert_get_duplicate() {
         let key = 55;
-        let mut list: SkipList<i32> = Default::default();
+        let value = 55555;
+        let mut list: SkipList<i32, i32> = Default::default();
 
         {
-            assert!(list.insert(key));
+            assert!(list.insert(key, value));
             let first_fetched = list.get(&key);
             assert!(first_fetched.is_some());
             // This is value comparison. The key should be the same as the one inserted
-            assert_eq!(*first_fetched.unwrap(), key);
+            assert_eq!(*first_fetched.unwrap(), value);
         }
 
         // The second insertion should fail, the key is already there
-        assert!(!list.insert(key));
+        assert!(!list.insert(key, value));
         // Duplicate insertions don't change the length
         assert_eq!(list.len(), 1);
         let second_fetched = list.get(&key);
@@ -461,59 +480,61 @@ mod tests {
 
     #[test]
     fn insert_two_remove() {
-        let key_1: i32 = 435;
-        let key_2: i32 = 555;
-        let mut list: SkipList<i32> = Default::default();
+        let key_1 = 435;
+        let value_1 = 938383;
+        let key_2 = 555;
+        let value_2 = 98484;
+        let mut list: SkipList<i32, i32> = Default::default();
         assert_eq!(list.len(), 0);
 
-        assert!(list.insert(key_1));
+        assert!(list.insert(key_1, value_1));
         assert_eq!(list.len(), 1);
-        assert!(list.contains(&key_1));
-        assert!(!list.contains(&key_2));
+        assert!(list.contains_key(&key_1));
+        assert!(!list.contains_key(&key_2));
 
-        assert!(list.insert(key_2));
+        assert!(list.insert(key_2, value_2));
         assert_eq!(list.len(), 2);
-        assert!(list.contains(&key_1));
-        assert!(list.contains(&key_2));
+        assert!(list.contains_key(&key_1));
+        assert!(list.contains_key(&key_2));
 
         assert!(list.remove(&key_1));
         assert_eq!(list.len(), 1);
-        assert!(!list.contains(&key_1));
-        assert!(list.contains(&key_2));
+        assert!(!list.contains_key(&key_1));
+        assert!(list.contains_key(&key_2));
 
-        assert!(list.insert(key_1));
+        assert!(list.insert(key_1, value_1));
         assert_eq!(list.len(), 2);
-        assert!(list.contains(&key_1));
-        assert!(list.contains(&key_2));
+        assert!(list.contains_key(&key_1));
+        assert!(list.contains_key(&key_2));
 
         assert!(list.remove(&key_2));
         assert_eq!(list.len(), 1);
-        assert!(list.contains(&key_1));
-        assert!(!list.contains(&key_2));
+        assert!(list.contains_key(&key_1));
+        assert!(!list.contains_key(&key_2));
 
         assert!(list.remove(&key_1));
         assert_eq!(list.len(), 0);
-        assert!(!list.contains(&key_1));
-        assert!(!list.contains(&key_2));
+        assert!(!list.contains_key(&key_1));
+        assert!(!list.contains_key(&key_2));
     }
 
 
     #[test]
     fn insert_adds_one_to_length() {
-        fn prop(mut list: SkipList<i32>) -> TestResult {
+        fn prop(mut list: SkipList<i32, i32>) -> TestResult {
             let length = list.len();
             // This just needs to produce a value that is not in the list yet...
-            let sum: i32 = list.iter().map(|v| v.abs()).sum();
-            list.insert(sum + 1);
+            let sum: i32 = list.iter().map(|v| v.0.abs()).sum();
+            list.insert(sum + 1, sum);
             TestResult::from_bool(list.len() == length + 1)
         }
 
-        quickcheck(prop as fn(SkipList<i32>) -> TestResult);
+        quickcheck(prop as fn(SkipList<i32, i32>) -> TestResult);
     }
 
     #[test]
     fn remove_empty() {
-        let mut list: SkipList<i32> = Default::default();
+        let mut list: SkipList<i32, i32> = Default::default();
         assert!(list.is_empty());
         assert!(!list.remove(&3));
         assert_eq!(list.len(), 0);
@@ -525,16 +546,17 @@ mod tests {
 
     #[test]
     fn remove_single() {
-        let key: i32 = 12;
-        let mut list: SkipList<i32> = Default::default();
+        let key = 12;
+        let value = 83383;
+        let mut list: SkipList<i32, i32> = Default::default();
 
-        assert!(list.insert(key));
+        assert!(list.insert(key, value));
         assert_eq!(list.len(), 1);
-        assert!(list.contains(&key));
+        assert!(list.contains_key(&key));
 
         assert!(list.remove(&key));
         assert_eq!(list.len(), 0);
-        assert!(!list.contains(&key));
+        assert!(!list.contains_key(&key));
 
         assert!(!list.remove(&key));
     }
@@ -544,7 +566,7 @@ mod tests {
         use self::rand::Rng;
         let mut rng = self::rand::thread_rng();
 
-        let mut list: SkipList<u32> = Default::default();
+        let mut list: SkipList<u32, u32> = Default::default();
         let mut inserted = std::collections::BTreeSet::new();
 
         let mut elements = 0;
@@ -552,8 +574,8 @@ mod tests {
             let element = rng.next_u32();
             assert_eq!(list.len(), elements);
 
-            assert!(list.insert(element));
-            assert!(list.contains(&element));
+            assert!(list.insert(element, element + 1));
+            assert!(list.contains_key(&element));
 
             inserted.insert(element);
             elements += 1;
@@ -562,110 +584,110 @@ mod tests {
         for element in &inserted {
             assert_eq!(list.len(), elements);
 
-            assert!(list.contains(element));
-            assert!(!list.insert(*element));
+            assert!(list.contains_key(element));
+            assert!(!list.insert(*element, element + 2));
 
             if rng.next_u32() % 2 == 0 {
                 assert!(list.remove(element));
-                assert!(!list.contains(element));
+                assert!(!list.contains_key(element));
                 elements -= 1;
             }
         }
     }
-
-    #[test]
-    fn remove_takes_one_from_length() {
-        fn prop(mut list: SkipList<i32>) -> TestResult {
-            let length = list.len();
-            if length == 0 {
-                return TestResult::discard();
-            }
-
-            let first = list.iter().next().unwrap().clone();
-            list.remove(&first);
-            TestResult::from_bool(list.len() == length - 1)
-        }
-
-        quickcheck(prop as fn(SkipList<i32>) -> TestResult);
-    }
+// TODO:
+//    #[test]
+//    fn remove_takes_one_from_length() {
+//        fn prop(mut list: SkipList<i32, i32>) -> TestResult {
+//            let length = list.len();
+//            if length == 0 {
+//                return TestResult::discard();
+//            }
+//
+//            let first = list.iter().next().unwrap().clone();
+//            list.remove(first.0);
+//            TestResult::from_bool(list.len() == length - 1)
+//        }
+//
+//        quickcheck(prop as fn(SkipList<i32, i32>) -> TestResult);
+//    }
 
     #[test]
     fn format_empty() {
-        let list: SkipList<u32> = Default::default();
-        assert_eq!(format!("{}", list), "[]");
+        let list: SkipList<u32, u32> = Default::default();
+        assert_eq!(format!("{}", list), "{}");
     }
 
     #[test]
     fn format_singleton() {
-        let mut list: SkipList<u32> = Default::default();
-        list.insert(1);
-        assert_eq!(format!("{}", list), "[1]");
+        let mut list: SkipList<u32, u32> = Default::default();
+        list.insert(1, 6);
+        assert_eq!(format!("{}", list), "{ 1: 6 }");
     }
 
     #[test]
     fn format_two() {
-        let mut list: SkipList<u32> = Default::default();
-        list.insert(1);
-        list.insert(2);
-        assert_eq!(format!("{}", list), "[1, 2]");
+        let mut list: SkipList<u32, u32> = Default::default();
+        list.insert(1, 4);
+        list.insert(2, 6);
+        assert_eq!(format!("{}", list), "{ 1: 4, 2: 6}");
     }
 
     #[test]
     fn format_multiple() {
-        let mut list: SkipList<u32> = Default::default();
-        list.insert(1);
-        list.insert(2);
-        list.insert(3);
-        list.insert(4);
-        list.insert(5);
-        list.insert(6);
+        let mut list: SkipList<u32, u32> = Default::default();
+        list.insert(1, 2);
+        list.insert(2, 3);
+        list.insert(3, 4);
+        list.insert(4, 5);
+        list.insert(5, 6);
+        list.insert(6, 1);
         assert_eq!(format!("{}", list), "[1, 2, 3, 4, 5, 6]")
     }
 
     #[test]
     #[should_panic]
     fn index_empty() {
-        let list: SkipList<u32> = Default::default();
+        let list: SkipList<u32, u32> = Default::default();
         list[23];
     }
 
     #[test]
     fn index_singleton() {
-        let mut list: SkipList<u32> = Default::default();
-        list.insert(32);
-        assert_eq!(list[32], 32);
+        let mut list: SkipList<u32, u32> = Default::default();
+        list.insert(32, 12);
+        assert_eq!(list[32], 12);
     }
 
     #[test]
     #[should_panic]
     fn index_singleton_nonexistant() {
-        let mut list: SkipList<u32> = Default::default();
-        list.insert(32);
+        let mut list: SkipList<u32, u32> = Default::default();
+        list.insert(32, 43);
         list[23];
     }
 
     #[test]
     fn index_multiple() {
-        let mut list: SkipList<u32> = Default::default();
-        list.insert(3);
-        list.insert(2);
-        list.insert(6);
-        list.insert(1);
-        list.insert(5);
-        list.insert(4);
+        let mut list: SkipList<u32, u32> = Default::default();
+        list.insert(3, 3);
+        list.insert(2, 2);
+        list.insert(6, 6);
+        list.insert(1, 1);
+        list.insert(5, 5);
+        list.insert(4, 4);
         assert_eq!(list[6], 6);
     }
 
     #[test]
     #[should_panic]
     fn index_multiple_nonexistant() {
-        let mut list: SkipList<u32> = Default::default();
-        list.insert(3);
-        list.insert(2);
-        list.insert(6);
-        list.insert(1);
-        list.insert(5);
-        list.insert(4);
+        let mut list: SkipList<u32, u32> = Default::default();
+        list.insert(3, 6);
+        list.insert(2, 7);
+        list.insert(6, 10);
+        list.insert(1, 231);
+        list.insert(5, 154);
+        list.insert(4, 6565);
         list[23];
     }
 
