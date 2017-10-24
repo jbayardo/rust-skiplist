@@ -1,10 +1,11 @@
 use std;
+use std::borrow::{Borrow, BorrowMut};
 
 #[derive(Debug)]
 pub(crate) struct Node<K, V> {
     forward_: std::vec::Vec<*mut Node<K, V>>,
     key_: K,
-    value_: V
+    value_: V,
 }
 
 impl<K, V> Node<K, V> {
@@ -15,7 +16,7 @@ impl<K, V> Node<K, V> {
         Node {
             forward_: vec![std::ptr::null_mut(); height + 1],
             key_: key,
-            value_: value
+            value_: value,
         }
     }
 
@@ -37,7 +38,7 @@ impl<K, V> Node<K, V> {
         }
     }
 
-    pub fn mut_next(&mut self, height: usize) -> Option<&mut Node<K, V>> {
+    pub fn next_mut(&mut self, height: usize) -> Option<&mut Node<K, V>> {
         match self.forward_.get(height) {
             None => None,
             Some(ptr) => {
@@ -65,15 +66,34 @@ impl<K, V> Node<K, V> {
         }
     }
 
-    pub fn key(&self) -> &K {
-        &self.key_
+    pub fn key<Q>(&self) -> &Q
+    where
+        K: Borrow<Q>,
+        Q: ?Sized,
+    {
+        (&self.key_).borrow()
     }
 
-    pub fn value(&self) -> &V {
-        &self.value_
+    pub fn value<Q>(&self) -> &Q
+    where
+        V: Borrow<Q>,
+        Q: ?Sized,
+    {
+        (&self.value_).borrow()
+    }
+
+    pub fn value_mut<Q>(&mut self) -> &mut Q
+    where
+        V: BorrowMut<Q>,
+        Q: ?Sized,
+    {
+        (&mut self.value_).borrow_mut()
+    }
+
+    pub fn replace_value(&mut self, value: V) -> V {
+        std::mem::replace(&mut self.value_, value)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -97,7 +117,7 @@ mod tests {
         let height = 5;
         let mut node = Node::new(key, value, height);
         assert!(node.next(10).is_none());
-        assert!(node.mut_next(10).is_none());
+        assert!(node.next_mut(10).is_none());
     }
 
     #[test]
@@ -108,7 +128,7 @@ mod tests {
         let mut node = Node::new(key, value, height);
         for height in 0..height {
             assert!(node.next(height).is_none());
-            assert!(node.mut_next(height).is_none());
+            assert!(node.next_mut(height).is_none());
         }
     }
 
@@ -125,7 +145,7 @@ mod tests {
         node.link_to(k_node_set_height, next_node);
 
         for h in 0..node.height() {
-            let next = node.mut_next(h);
+            let next = node.next_mut(h);
 
             if h == k_node_set_height {
                 let next_ptr = next.unwrap();

@@ -1,4 +1,4 @@
-use skiplist::SkipList;
+use map::SkipListMap;
 
 use std;
 use std::default::Default;
@@ -263,7 +263,7 @@ impl<K> Clone for TwoPowGenerator<K> {
     }
 }
 
-impl<K: 'static + std::hash::Hash, V> Default for SkipList<K, V> {
+impl<K: 'static + std::hash::Hash, V> Default for SkipListMap<K, V> {
     fn default() -> Self {
         Self::new(Box::new(TwoPowGenerator::new(16)))
     }
