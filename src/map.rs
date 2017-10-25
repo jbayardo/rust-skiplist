@@ -3,7 +3,6 @@ use height_control::HeightControl;
 
 use std;
 use std::borrow::Borrow;
-use std::collections::range::RangeArgument;
 
 pub struct SkipListMap<K, V> {
     /// Pointer to the head of the Skip List. The first node is actually a "ghost"
@@ -169,7 +168,7 @@ impl<K: std::fmt::Debug, V: std::fmt::Debug> std::fmt::Debug for SkipListMap<K, 
 
 impl<K: Ord, V> SkipListMap<K, V> {
     /// Finds the node previous to the node that would have `key`, if any.
-    fn find_lower_bound<Q>(&self, key: &Q) -> &Node<K, V>
+    pub(crate) fn find_lower_bound<Q>(&self, key: &Q) -> &Node<K, V>
     where
         K: Borrow<Q>,
         Q: Ord + ?Sized,
@@ -189,7 +188,7 @@ impl<K: Ord, V> SkipListMap<K, V> {
         unsafe { &*current_ptr }
     }
 
-    fn find_lower_bound_mut<Q>(&self, key: &Q) -> &mut Node<K, V>
+    pub(crate) fn find_lower_bound_mut<Q>(&mut self, key: &Q) -> &mut Node<K, V>
     where
         K: Borrow<Q>,
         Q: Ord + ?Sized,
@@ -254,21 +253,18 @@ impl<K: Ord, V> SkipListMap<K, V> {
     // Insert `key`. Returns false if `key` was already found.
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         // TODO: initialize this later. This may not ever get used if the key
-        // already exists
+        // already exists. Should be done right before allocating the node.
         let height = self.controller_.get_height(&key);
 
         {
             let (lower_bound, mut updates) = self.find_lower_bound_with_updates(&key);
 
-            match lower_bound.next_mut(0) {
-                // The lower bound's next node, if present, could be the same as the
-                // key we are looking for, so we could abort early here
-                Some(next) => {
-                    if unlikely!(next.key() == &key) {
-                        return Some(next.replace_value(value));
-                    }
+            if let Some(next) = lower_bound.next_mut(0) {
+                // The lower bound's next node, if present, could be the same
+                // as the key we are looking for, so we could abort early here
+                if unlikely!(next.key() == &key) {
+                    return Some(next.replace_value(value));
                 }
-                _ => {}
             }
 
             let node = Self::allocate_node(key, value, height);
@@ -296,37 +292,30 @@ impl<K: Ord, V> SkipListMap<K, V> {
         Q: Ord + ?Sized,
     {
         let lower_bound = self.find_lower_bound(key);
-
-        match lower_bound.next(0) {
-            Some(node) => {
-                if likely!(node.key() == key) {
-                    Some(node.value())
-                } else {
-                    None
-                }
-            }
-            None => None,
-        }
+        lower_bound.next(0).and_then(
+            |node| if likely!(node.key() == key) {
+                Some(node.value())
+            } else {
+                None
+            },
+        )
     }
 
     /// Returns a mutable reference to the element with key `key`, if it exists.
-    pub fn get_mut<Q>(&self, key: &Q) -> Option<&mut V>
+    pub fn get_mut<Q>(&mut self, key: &Q) -> Option<&mut V>
     where
         K: Borrow<Q>,
         Q: Ord + ?Sized,
     {
         let lower_bound = self.find_lower_bound_mut(key);
-
-        match lower_bound.next_mut(0) {
-            Some(node) => {
-                if likely!(node.key() == key) {
-                    Some(node.value_mut())
-                } else {
-                    None
-                }
-            }
-            None => None,
-        }
+        lower_bound.next_mut(0).and_then(|node| if likely!(
+            node.key() == key
+        )
+        {
+            Some(node.value_mut())
+        } else {
+            None
+        })
     }
 
     /// Returns true if `key` is in the list.
@@ -381,33 +370,25 @@ impl<K: Ord, V> SkipListMap<K, V> {
         Some(old_value)
     }
 
-    pub fn append(&mut self, _other: &mut SkipListMap<K, V>) {
-        unimplemented!()
+    pub fn first(&self) -> Option<(&K, &V)> {
+        unsafe { (*self.head_).next(0).map(|node| node.key_value()) }
     }
 
-    pub fn range<T, R>(&self, _range: R) -> std::collections::btree_map::Range<K, V>
-    where
-        K: Borrow<T>,
-        R: RangeArgument<T>,
-        T: Ord + ?Sized,
-    {
-        unimplemented!()
+    pub fn first_mut(&mut self) -> Option<(&K, &mut V)> {
+        unsafe { (*self.head_).next_mut(0).map(|node| node.key_value_mut()) }
     }
 
-    pub fn range_mut<T, R>(&mut self, _range: R) -> std::collections::btree_map::RangeMut<K, V>
-    where
-        K: Borrow<T>,
-        R: RangeArgument<T>,
-        T: Ord + ?Sized,
-    {
-        unimplemented!()
-    }
-
+    // TODO: The following are easier to implement with Drain
     pub fn split_off<Q>(&mut self, _key: &Q) -> SkipListMap<K, V>
     where
         K: Borrow<Q>,
         Q: Ord + ?Sized,
     {
+
+        unimplemented!()
+    }
+
+    pub fn append(&mut self, _other: &mut SkipListMap<K, V>) {
         unimplemented!()
     }
 }
@@ -444,8 +425,6 @@ impl<K: Ord + Clone, V: Clone> Clone for SkipListMap<K, V> {
         copied
     }
 }
-
-// TODO: range queries
 
 // TODO: prefetch, benchmarks
 #[cfg(test)]

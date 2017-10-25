@@ -27,9 +27,9 @@ fn iter_single() {
 #[test]
 fn iter_two() {
     let key_1 = 55;
-    let value_1 = 12312;
+    let value_1 = 112;
     let key_2 = 687;
-    let value_2 = 49548;
+    let value_2 = 448;
 
     let mut list: SkipListMap<i32, i32> = Default::default();
     list.insert(key_1, value_1);

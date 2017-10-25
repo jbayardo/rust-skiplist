@@ -26,29 +26,23 @@ impl<K, V> Node<K, V> {
 
     // Returns a reference to the underlying node at the given height
     pub fn next(&self, height: usize) -> Option<&Node<K, V>> {
-        match self.forward_.get(height) {
-            None => None,
-            Some(ptr) => {
-                if unlikely!(ptr.is_null()) {
-                    None
-                } else {
-                    Some(unsafe { &**ptr })
-                }
-            }
-        }
+        self.forward_.get(height).and_then(
+            |ptr| if unlikely!(ptr.is_null()) {
+                None
+            } else {
+                Some(unsafe { &**ptr })
+            },
+        )
     }
 
     pub fn next_mut(&mut self, height: usize) -> Option<&mut Node<K, V>> {
-        match self.forward_.get(height) {
-            None => None,
-            Some(ptr) => {
-                if unlikely!(ptr.is_null()) {
-                    None
-                } else {
-                    Some(unsafe { &mut **ptr })
-                }
-            }
-        }
+        self.forward_.get(height).and_then(
+            |ptr| if unlikely!(ptr.is_null()) {
+                None
+            } else {
+                Some(unsafe { &mut **ptr })
+            },
+        )
     }
 
     pub fn link_to(&mut self, height: usize, destination: *mut Node<K, V>) {
@@ -88,6 +82,14 @@ impl<K, V> Node<K, V> {
         Q: ?Sized,
     {
         (&mut self.value_).borrow_mut()
+    }
+
+    pub fn key_value(&self) -> (&K, &V) {
+        (&self.key_, &self.value_)
+    }
+
+    pub fn key_value_mut(&mut self) -> (&K, &mut V) {
+        (&self.key_, &mut self.value_)
     }
 
     pub fn replace_value(&mut self, value: V) -> V {

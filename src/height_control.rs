@@ -5,14 +5,15 @@ use std::default::Default;
 
 extern crate rand;
 
-/// This comes from the slightly delicate usage that we have for `HeightControl<K>`: `SkipList<K>`
-/// needs to hold a trait object that satisfies `HeightControl<K>`; however, there is no way to
-/// impose a reasonable Clone constraint in that case, so there's two options: either we derive from
-/// Clone in HeightControl<K>, or we do the trick below.
+/// This comes from the slightly delicate usage that we have for
+/// `HeightControl<K>`: `SkipList<K>` needs to hold a trait object that
+/// satisfies `HeightControl<K>`; however, there is no way to impose a
+/// reasonable `Clone` constraint in that case, so there's two options: either
+/// we derive from `Clone` in `HeightControl<K>`, or we do the trick below.
 ///
-/// The first option was discarded because it is very unclear; the second is used below. Users do
-/// not need to effectively do anything about it, they just implement Clone for their structs that
-/// implement HeightControl<K>.
+/// The first option was discarded because it is very unclear; the second is
+/// used below. Users do not need to effectively do anything about it, they
+/// just implement `Clone` for their structs that implement `HeightControl<K>`.
 pub trait HeightControlClone<K> {
     fn clone_box(&self) -> Box<HeightControl<K>>;
 }
