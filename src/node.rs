@@ -61,35 +61,47 @@ impl<K, V> Node<K, V> {
     }
 
     pub fn key<Q>(&self) -> &Q
-    where
-        K: Borrow<Q>,
-        Q: ?Sized,
+        where
+            K: Borrow<Q>,
+            Q: ?Sized,
     {
         (&self.key_).borrow()
     }
 
-    pub fn value<Q>(&self) -> &Q
-    where
-        V: Borrow<Q>,
-        Q: ?Sized,
+    pub fn value<W>(&self) -> &W
+        where
+            V: Borrow<W>,
+            W: ?Sized,
     {
         (&self.value_).borrow()
     }
 
-    pub fn value_mut<Q>(&mut self) -> &mut Q
-    where
-        V: BorrowMut<Q>,
-        Q: ?Sized,
+    pub fn value_mut<W>(&mut self) -> &mut W
+        where
+            V: BorrowMut<W>,
+            W: ?Sized,
     {
         (&mut self.value_).borrow_mut()
     }
 
-    pub fn key_value(&self) -> (&K, &V) {
-        (&self.key_, &self.value_)
+    pub fn key_value<Q, W>(&self) -> (&Q, &W)
+        where
+            K: Borrow<Q>,
+            Q: ?Sized,
+            V: Borrow<W>,
+            W: ?Sized,
+    {
+        (&self.key_.borrow(), &self.value_.borrow())
     }
 
-    pub fn key_value_mut(&mut self) -> (&K, &mut V) {
-        (&self.key_, &mut self.value_)
+    pub fn key_value_mut<Q, W>(&mut self) -> (&Q, &mut W)
+        where
+            K: Borrow<Q>,
+            Q: ?Sized,
+            V: BorrowMut<W>,
+            W: ?Sized,
+    {
+        (&self.key_.borrow(), (&mut self.value_).borrow_mut())
     }
 
     pub fn replace_value(&mut self, value: V) -> V {
@@ -162,13 +174,4 @@ mod tests {
             Box::from_raw(next_node);
         }
     }
-
-    #[test]
-    fn link_out_of_range() {}
-
-    #[test]
-    fn link_next_singleton() {}
-
-    #[test]
-    fn link_next_out_of_range() {}
 }

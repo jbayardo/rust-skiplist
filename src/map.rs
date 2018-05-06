@@ -329,10 +329,10 @@ impl<K: Ord, V> SkipListMap<K, V> {
 
     /// Removes `key` from the list. Returns true if it was successfully
     /// removed; false if it was not found.
-    pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<V>
+    pub fn remove<Q>(&mut self, key: &Q) -> Option<V>
     where
         K: Borrow<Q>,
-        Q: Ord,
+        Q: Ord + ?Sized,
     {
         let old_value;
 

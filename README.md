@@ -6,6 +6,15 @@ Skip List implementation for Rust. Currently **under very active development**; 
 
 [![Percentage of issues still open](http://isitmaintained.com/badge/open/jbayardo/rust-skiplist.svg)](http://isitmaintained.com/project/jbayardo/rust-skiplist "Percentage of issues still open") [![Average time to resolve an issue](http://isitmaintained.com/badge/resolution/jbayardo/rust-skiplist.svg)](http://isitmaintained.com/project/jbayardo/rust-skiplist "Average time to resolve an issue") 
 
+Missing work:
+* Mutable range iterators (easy)
+* Tests for all iterators (easy)
+* More testing would do great. Node is an easy example. The linked list needs more tests too
+* Testing for memory leaks would be good too.
+* You can try compiling on stable and testing what needs to be done to make it compatible
+* It would be good to add some statistical testing to the HeighControl to ensure output is distributed as expected
+* This can be turned into a lock-free dictionary, just need proper atomics support and some work (hard)
+
 # Releases
 
 Library releases follow [semantic versioning](http://semver.org/). Versioned releases can be found in Github's [release manager](https://github.com/jbayardo/rust-skiplist/releases).
