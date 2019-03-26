@@ -1,5 +1,5 @@
-use node::Node;
-use height_control::HeightControl;
+use crate::node::Node;
+use crate::height_control::HeightControl;
 
 use std;
 use std::borrow::Borrow;
@@ -433,7 +433,7 @@ mod tests {
 
     use super::*;
     use quickcheck::{Arbitrary, quickcheck, TestResult, Gen};
-    use height_control::GeometricalGenerator;
+    use crate::height_control::GeometricalGenerator;
 
     // TODO: when moving into multithreaded support, ensure we protect accordingly.
     unsafe impl<K, V> Send for SkipListMap<K, V> {}

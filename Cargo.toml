@@ -8,6 +8,7 @@ homepage = "https://github.com/jbayardo/rust-skiplist"
 repository = "https://github.com/jbayardo/rust-skiplist.git"
 readme = "README.md"
 license-file = "LICENSE"
+edition = "2018"
 
 [badges]
 travis-ci = { repository = "jbayardo/rust-skiplist", branch = "master" }

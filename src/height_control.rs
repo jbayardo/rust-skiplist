@@ -1,4 +1,4 @@
-use map::SkipListMap;
+use crate::map::SkipListMap;
 
 use std;
 use std::default::Default;

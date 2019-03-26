@@ -1,9 +1,9 @@
-use node::Node;
-use map::SkipListMap;
+use crate::node::Node;
+use crate::map::SkipListMap;
 
 use std;
 use std::borrow::Borrow;
-use std::collections::range::RangeArgument;
+use std::ops::RangeBounds;
 use std::collections::Bound;
 
 pub struct Iter<'a, K: 'a, V: 'a>(Option<&'a Node<K, V>>);
@@ -137,10 +137,10 @@ impl<'a, K: 'a + Ord, V: 'a> Range<'a, K, V> {
     pub fn new<T, R>(list: &SkipListMap<K, V>, range: R) -> Range<K, V>
     where
         K: Borrow<T>,
-        R: RangeArgument<T>,
+        R: RangeBounds<T>,
         T: Ord + ?Sized,
     {
-        let lower_bound = match range.start() {
+        let lower_bound = match range.start_bound() {
             Bound::Included(key) => list.find_lower_bound(key).next(0),
             Bound::Excluded(key) => {
                 list.find_lower_bound(key).next(0).and_then(
@@ -155,7 +155,7 @@ impl<'a, K: 'a + Ord, V: 'a> Range<'a, K, V> {
             Bound::Unbounded => unsafe { (*list.head_).next(0) },
         };
 
-        let upper_bound = match range.end() {
+        let upper_bound = match range.end_bound() {
             Bound::Included(key) => list.find_lower_bound(key).next(0),
             Bound::Excluded(key) => Some(list.find_lower_bound(key)),
             Bound::Unbounded => None,
@@ -194,7 +194,7 @@ impl<K: Ord, V> SkipListMap<K, V> {
     pub fn range<T, R>(&self, range: R) -> Range<K, V>
     where
         K: Borrow<T>,
-        R: RangeArgument<T>,
+        R: RangeBounds<T>,
         T: Ord + ?Sized,
     {
         Range::new(self, range)
@@ -203,7 +203,7 @@ impl<K: Ord, V> SkipListMap<K, V> {
     pub fn range_mut<T, R>(&mut self, _range: R) -> std::collections::btree_map::RangeMut<K, V>
     where
         K: Borrow<T>,
-        R: RangeArgument<T>,
+        R: RangeBounds<T>,
         T: Ord + ?Sized,
     {
         unimplemented!()
